@@ -1,0 +1,33 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 1 - Basic chips in Hardware.
+                           ----------------------- 
+  
+
+Submitted Files
+---------------
+README - this file.
+And.hdl - The AND chip.
+And16.hdl - the AND for 16 bit chip.
+DMux.hdl - the Demultiplexor chip.
+DMux4Way.hdl - The Demultiplexor for 4 inputs.
+DMux8Way.hdl - The Demultiplexor for 8 inputs.
+Mux.hdl - The Multiplexor chip.
+Mux16.hdl - The 16-bit Multiplexor chip.
+Mux4Way16.hdl - A 4-way 16-bit multiplexor.
+Mux8Way16.hdl - A 8-way 16-bit multiplexor.
+Not.hdl - A simple negation chip.
+Not16.hdl - A 16-bit Not chip.
+Or.hdl - A Or chip.
+Or16.hdl - A 16-bit Or chip.
+Or8Way.hdl - 8-way Or chip.
+Xor.hdl - A Xor chip.
+
+
+Remarks
+-------
+* No special comments.
