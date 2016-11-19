@@ -16,5 +16,40 @@ CHIP DMux8Way {
     OUT a, b, c, d, e, f, g, h;
 
     PARTS:
-    // Put your code here:
+    Not(in = sel[0], out = notsel0);
+    Not(in = sel[1], out = notsel1);
+    Not(in = sel[2], out = notsel2);
+    
+    And(a = notsel2, b = notsel1, out = temp1);
+    And(a = notsel0, b = in, out = temp2);
+    And(a = temp1, b = temp2, out = a);
+
+    And(a = notsel2, b = notsel1, out = temp3);
+    And(a = sel[0], b = in, out = temp4);
+    And(a = temp3, b = temp4, out = b);
+
+    And(a = notsel2, b = sel[1], out = temp5);
+    And(a = notsel0, b = in, out = temp6);
+    And(a = temp5, b = temp6, out = c);
+
+    And(a = notsel2, b = sel[1], out = temp7);
+    And(a = sel[0], b = in, out = temp8);
+    And(a = temp7, b = temp8, out = d);
+
+    And(a = sel[2], b = notsel1, out = temp9);
+    And(a = notsel0, b = in, out = temp10);
+    And(a = temp9, b = temp10, out = e);
+
+    And(a = sel[2], b = notsel1, out = temp11);
+    And(a = sel[0], b = in, out = temp12);
+    And(a = temp11, b = temp12, out = f);
+
+    And(a = sel[2], b = sel[1], out = temp13);
+    And(a = notsel0, b = in, out = temp14);
+    And(a = temp13, b = temp14, out = g);
+
+    And(a = sel[2], b = sel[1], out = temp15);
+    And(a = sel[0], b = in, out = temp16);
+    And(a = temp15, b = temp16, out = h);
+   
 }
