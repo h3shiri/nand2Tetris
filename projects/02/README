@@ -1,0 +1,23 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 2 - Basic chips in Hardware.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+ALU.hdl - the ALU chip performing the various functions
+Add16.hdl - Adds two 16-bit values the most significant carry bit is ignored.
+EqZero16.hdl - checks whether all the bits are zero, plus if the most significant bit is on.
+EqZero4.hdl - an assisting chip that checks whether 4-bit number is zero.
+FullAdder.hdl - Computes the sum of three bits.
+HalfAdder.hdl - Computes the sum of two bits.
+Inc16.hdl - 16-bit incrementer.
+
+Remarks
+-------
+* No special comments.
