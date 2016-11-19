@@ -1,0 +1,21 @@
+// This chip is assisting the ALU chip by checkin g whether a number is zero
+// In addition we flag if the given number is negative.
+/**
+ * checks whether all the bits are zero.
+ * check if the most significant bit is on.
+ */
+
+CHIP EqZero16 {
+    IN in[16];
+    OUT zr, ng;
+
+    PARTS:
+    And(a = in[15], b = true, out = ng);
+    EqZero4(in = in[0..3], zr = t1);
+    EqZero4(in = in[4..7], zr = t2);
+    EqZero4(in = in[8..11], zr = t3);
+    EqZero4(in = in[12..15], zr = t4);
+    And(a = t1, b = t2, out = y1);
+    And(a = t3, b = t4, out = y2);
+    And(a = y1, b = y2, out = zr);
+}
