@@ -1,0 +1,61 @@
+CHIP Mul{
+    IN a[16], b[16];
+    OUT out[16];
+
+    PARTS:
+//multiple each index of b by shifting a each time, so we get the desired result (each index gets shifted in ammount that is the index number
+
+/* Pre calculating all the various shifts */
+ShiftLeft(in=a, out=aShift1);
+ShiftLeft(in=aShift1, out=aShift2);
+ShiftLeft(in=aShift2, out=aShift3);
+ShiftLeft(in=aShift3, out=aShift4);
+ShiftLeft(in=aShift4, out=aShift5);
+ShiftLeft(in=aShift5, out=aShift6);
+ShiftLeft(in=aShift6, out=aShift7);
+ShiftLeft(in=aShift7, out=aShift8);
+ShiftLeft(in=aShift8, out=aShift9);
+ShiftLeft(in=aShift9, out=aShift10);
+ShiftLeft(in=aShift10, out=aShift11);
+ShiftLeft(in=aShift11, out=aShift12);
+ShiftLeft(in=aShift12, out=aShift13);
+ShiftLeft(in=aShift13, out=aShift14);
+ShiftLeft(in = aShift14, out = aShift15);
+
+Mux16(a = false, b = a, sel = b[0], out = m0);
+Mux16(a = false, b = aShift1, sel = b[1], out = m1);
+Mux16(a = false, b = aShift2, sel = b[2], out = m2);
+Mux16(a = false, b = aShift3, sel = b[3], out = m3);
+Mux16(a = false, b = aShift4, sel = b[4], out = m4);
+Mux16(a = false, b = aShift5, sel = b[5], out = m5);
+Mux16(a = false, b = aShift6, sel = b[6], out = m6);
+Mux16(a = false, b = aShift7, sel = b[7], out = m7);
+Mux16(a = false, b = aShift8, sel = b[8], out = m8);
+Mux16(a = false, b = aShift9, sel = b[9], out = m9);
+Mux16(a = false, b = aShift10, sel = b[10], out = m10);
+Mux16(a = false, b = aShift11, sel = b[11], out = m11);
+Mux16(a = false, b = aShift12, sel = b[12], out = m12);
+Mux16(a = false, b = aShift13, sel = b[13], out = m13);
+Mux16(a = false, b = aShift14, sel = b[14], out = m14);
+Mux16(a = false, b = aShift15, sel = b[15], out = m15);
+
+
+//adding all together:
+
+Add16(a = m1, b = m2, out = num1);
+Add16(a = m3, b = m4, out = num2);
+Add16(a = m5, b = m6, out = num3);
+Add16(a = m7, b = m8, out = num4);
+Add16(a = m9, b = m10, out = num5);
+Add16(a = m11, b = m12, out = num6);
+Add16(a = m13, b = m14, out = num7);
+Add16(a = m15, b = m0, out = num8);
+Add16(a = num1, b = num2, out = g1);
+Add16(a = num3, b = num4, out = g2);
+Add16(a = num5, b = num6, out = g3);
+Add16(a = num7, b = num8, out = g4);
+Add16(a = g1, b = g2, out = k1);
+Add16(a = g3, b = g4, out = k2);
+Add16(a = k1, b = k2, out = out);
+
+}

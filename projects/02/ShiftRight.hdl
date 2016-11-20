@@ -1,0 +1,25 @@
+CHIP ShiftRight{
+     IN in[16];
+     OUT out[16];
+     
+     PARTS:
+     //set the left most according to sign
+     And(a = true, b = in[15], out = out[15]); 
+
+//starts shifting
+     And(a = in[15], b = true, out = out[14]);
+     And(a = in[14], b = true, out = out[13]);
+     And(a = in[13], b = true, out = out[12]);
+     And(a = in[12], b = true, out = out[11]);
+     And(a = in[11], b = true, out = out[10]);
+     And(a = in[10], b = true, out = out[9]);
+     And(a = in[9], b = true, out = out[8]);
+     And(a = in[8], b = true, out = out[7]);
+     And(a = in[7], b = true, out = out[6]);
+     And(a = in[6], b = true, out = out[5]);
+     And(a = in[5], b = true, out = out[4]);
+     And(a = in[4], b = true, out = out[3]);
+     And(a = in[3], b = true, out = out[2]);
+     And(a = in[2], b = true, out = out[1]);
+     And(a = in[1], b = true, out = out[0]);
+}
