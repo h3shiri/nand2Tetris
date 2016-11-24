@@ -1,0 +1,25 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 3 - Basic chips in Memory managment.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+Bit.hdl - the basic unit of sequential memory.
+DFF16.hdl - A utility chip functioning as a data flip flop for 16bit.
+PC.hdl - A programme counter with few flags.
+RAM64.hdl - A RAM unit of 64 registers (16bit width each).
+RAM8.hdl - A RAM unit of 8 registers (16bit width each).
+Register.hdl - A simple register 16-bit version.
+RAM16K.hdl - A RAM unit of 64K registers (16bit width each).
+RAM4K.hdl - A RAM unit of 4K registers (16bit width each).
+RAM512.hdl - A RAM unit of 512 registers (16bit width each).
+
+Remarks
+-------
+* No special comments.
