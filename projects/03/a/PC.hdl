@@ -16,5 +16,13 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    Inc16(in = looper, out = looperP1);
+    //Potetial modified out[t] value.
+    Mux16(a = looper, b = looperP1, sel = inc, out = ModifidLooper);
+    //resolved output before potetial reset.
+    Mux16(a = ModifidLooper, b = in, sel = load, out = tempRes);
+    //reset flag
+    Mux16(a = tempRes, b = false, sel = reset, out = finalRes);
+    //connecting the sequetial bit
+    DFF16(in = finalRes, out = looper, out = out);
 }

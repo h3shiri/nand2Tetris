@@ -1,0 +1,3 @@
+#Ignoring any unintended changes to the tools directory 
+#in this case any dat files
+tools/bin/*.dat
