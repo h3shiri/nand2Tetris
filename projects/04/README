@@ -1,0 +1,20 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 4 - Using Hack to preform various tasks, intro to assembly.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+Divide.asm - The basic programme for diving two 16-bit signed numbers (assuming both are positive).
+Mult.asm - A Basic programme for multiplying two 16-bit numbers.
+Fill.asm - Basic I/O for the keyboard, screen appears white or black according to interaction.
+Sort.asm - An assembly programme for sorting an array of 16-bit integers.
+
+Remarks
+-------
+* No special comments.
