@@ -61,4 +61,4 @@ M = M + 1
 	@OUTER_LOOP
 	0;JMP	
 (END)
-0;JEQ
+0;
