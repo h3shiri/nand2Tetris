@@ -11,4 +11,57 @@
 // "white" in every pixel;
 // the screen should remain fully clear as long as no key is pressed.
 
-// Put your code here.
+(START)
+	@WHITE //initialize colors
+	M = 0
+	@BLACK
+	M = -1
+	@SCREEN
+	D = A
+	@8192 //set marker to ammount of end of screen
+	D = D + A
+	@MARKER
+	M = D
+	@8192 // set counter to have the ammount of registers in the screen
+	D = A
+	@COUNTER
+	M = D
+	
+	@KBD //check keyboard activity and act accordingly
+	D = M
+	@WHITE
+	D;JEQ
+	@BLACK
+	D;JNE
+
+(BLACK)
+	@BLACK
+	D = M
+	@MARKER
+	A = M
+	M = D
+	@MARKER
+	M = M - 1
+	@COUNTER
+	M = M -1
+	D = M
+	@START
+	D;JEQ
+	@BLACK
+	D;JNE
+
+(WHITE)
+	@WHITE
+	D = M
+	@MARKER
+	A = M
+	M = D
+	@MARKER
+	M = M - 1
+	@COUNTER
+	M = M -1
+	D = M
+	@START
+	D;JEQ
+	@WHITE
+	D;JNE
