@@ -22,7 +22,7 @@
 	D = D + A
 	@MARKER
 	M = D
-	@8192 // set counter to have the ammount of registers in the screen
+	@8193 // set counter to have the ammount of registers in the screen
 	D = A
 	@COUNTER
 	M = D
