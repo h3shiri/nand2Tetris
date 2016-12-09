@@ -2,13 +2,12 @@
 D = M
 @OUTER_COUNTER
 M = D
-M = M + 1
 (OUTER_LOOP)	
 	@R15
 	D = M
 	@INNER_COUNTER
-	M = D
-	@R14 // Make POSITION hold the begin address of the array
+	M = D - 1 
+	@R14 //Make POSITION hold the begin address of the array
 	D = M
 	@POSITION
 	M = D
@@ -58,7 +57,7 @@ M = M + 1
 	A = M
 	A = A + 1
 	M = D
-	@OUTER_LOOP
+	@INNER_LOOP
 	0;JMP	
 (END)
-0;
+0;JEQ
