@@ -1,0 +1,18 @@
+// This chip is assisting the EqZero16 chip by checking whether 4 bits are zero.
+/**
+ * checks whether all the 4-bits are zero.
+ */
+
+CHIP EqZero4 {
+    IN in[4];
+    OUT zr;
+
+    PARTS:
+    Xor(a = in[0], b = true, out = t1);
+    Xor(a = in[1], b = true, out = t2);
+    Xor(a = in[2], b = true, out = t3);
+    Xor(a = in[3], b = true, out = t4);
+    And(a = t1, b = t2, out = g1);
+    And(a = t3, b = t4, out = g2);
+    And(a = g1, b = g2, out = zr);
+}
