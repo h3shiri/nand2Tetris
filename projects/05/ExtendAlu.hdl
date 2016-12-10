@@ -1,0 +1,47 @@
+/**
+* The input of the extends ALU is instruction[9] and x[16],y[16].
+* the output is define as follows:
+* If instruction[7..8] equals 1 the the output is exactly as the ALU.
+* Where instruction[5]=zx,instruction[4]=nx,...,instruction[0]=no.
+* If instruction[7] equals 0 the output will be x*y and disregard the rest 
+* of the instruction.
+*
+* If instruction[8] equals 0 the output will be shift.
+* Then, if instruction[4] equals 0 it will return shift of y otherwise shift 
+* of x, moreover if instruction[5] equals 0 it will return shift right 
+* otherwise shift left.
+**/
+CHIP ExtendAlu{
+     IN x[16],y[16],instruction[9];
+     OUT out[16],zr,ng;
+     
+     PARTS:
+     ALU(x = x, y = y, zx = instruction[5], nx = instruction[4], zy = instruction[3], ny = instruction[2], f = instruction[1], no = instruction[0], out = OriginalOUT, zr = zr1, ng = ng1);
+     Mul(a = x, b = y, out = MulOUT);
+     //various flags 
+     And(a = instruction[7], b = instruction[8], out = flagOriginal); // original flag
+     Not(in = instruction[7], out = flagMUL); // Multiplication flag
+     Not(in = instruction[8], out = flagSHIFT); // Shifting flag
+     Not(in = instruction[4], out = flagShiftY); // flag for signaling X or Y
+     Not(in = instruction[5], out = FlagShiftRight); // flag for direction of the shift.
+
+     //Possible shifts, combined to the shift potential output.
+     ShiftLeft(in = x, out = xLeft);
+     ShiftRight(in = x , out = xRight);
+     ShiftLeft(in = y, out = yLeft);
+     ShiftRight(in = y, out = yRight);
+     //Shifting according to flags.
+     Mux16(a = xLeft, b = xRight, sel = FlagShiftRight, out = xShift);
+     Mux16(a = yLeft, b = yRight, sel = FlagShiftRight, out = yShift);
+     Mux16(a = xShift, b = yShift, sel = flagShiftY, out = TempShiftOutput);
+     //Using the shift flag option with garbege value for a.
+     Mux16(a = false, b = TempShiftOutput, sel = flagSHIFT, out = ShiftedOutput);
+
+     /* Now we override with the multiplication flag. */
+     Mux16(a = ShiftedOutput, b = MulOUT, sel = flagMUL, out = semiFinalOutput);
+     /* On top of that we use the original flag. */
+     Mux16(a = semiFinalOutput, b = OriginalOUT, sel = flagOriginal, out = Tout);
+     /* result flags */
+     EqZero16(in = Tout, zr = zr, ng = ng);
+     And16(a = Tout, b = true, out = out);
+}
