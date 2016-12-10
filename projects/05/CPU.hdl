@@ -39,5 +39,53 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+	
+	//check instruction type (instruction[15] = 1 <=> cInstruction, aInstruction otherwise).
+	Xor(a = instruction[15], b = true, out = aInstruction);
+	Not(in = aInstruction, out = cInstruction);
+	
+	//We now need to check, whether we have 1. c instruction A = [some address] 
+	//and i mark it as cAinstruction, or 2. A instruction.
+	//both cases we need to move to the address.
+	//if its the case, instruction[5] = 1 and instruction[15] = 1
+	
+	//A instruction
+	And(a = cInstruction, b = instruction[5], out = cAinstruction);
+	Or(a = cAinstruction, b =  aInstruction, out = moveToA);
+	//So moveToA is now the loader for the ARegister chip
+	//We still need to mux the results with the ALUOutput, depending if its C - A instruction
+	Mux16(a = instruction, b = ALUOutput, sel = cAinstruction, out = register); 
+	//And now set the ARegister with the loader
+	ARegister(in = register, load = moveToA, out = Areg);
+	
+	//a OR m instruction
+	Mux16(a = Areg, b = inM, sel = instruction[12], out = AORM); 
+	
+	//D instruction
+	And(a = cInstruction, b = instruction[4], out = Dload);
+	DRegister(in = ALUOutput, load = Dload, out = Dout);
+	
+	//We gathered all inputs for ALU, now we can feed them and collect outputs
+	ALU(x = Dout, y = AORM, zx = instruction[11], nx = instruction[10],
+	zy = instruction[9] , ny = instruction[8], f = instruction[7],
+	no = instruction[6], out = ALUOutput, zr = ALUZR, ng = ALUNG);
+    
+	//set outputs
+	And16(a = true, b = Areg, out[0..14] = addressM); //If A instruction (or cA instruction), set address
+	And16(a = true, b = ALUOutput, out = outM);       
+	And(a = cInstruction, b = instruction[3], out = writeM); //set write to M if instruction
+	
+	//manage instructions jumps (if cInstruction)
+	And(a = ALUZR, b = instruction[1], out = jeq); //set jeq if Alu Zero and instruction[1]
+	And(a = ALUNG, b = instruction[2], out = jng); //set jng if Alu Neg and instruction[2]
+	Or(a = ALUZR, b = ALUNG, out = negOrZero);    // check if ALU out was less or neg
+	Not(in = negOrZero, out = positive);         // negate it and know if positive
+	And(a = positive, b = instruction[0], out = jgt); // set jgt 
+	Or(a = jeq, b = jng, out = temp);  //Now just check whether any jump is needed
+	Or(a = temp, b = jgt, out = Ajump);
+	
+	//manage PC chip 
+	And(a = cInstruction, b = Ajump, out = loadPC); //Only if cInstruction PC will execute 
+	Not(in = loadPC, out = incPC); //incPC is always the opposite of loader for PC
+	PC(in = Areg, load = loadPC, inc = incPC, reset = reset, out[0..14] = pc); //execute PC chip
 }
