@@ -17,7 +17,6 @@
 **/
 
 CHIP CpuMul{
-
     IN  inM[16],         // M value input  (M = contents of RAM[A])
         instruction[16], // Instruction for execution
         reset;           // Signals whether to re-start the current
@@ -30,68 +29,50 @@ CHIP CpuMul{
         pc[15];          // address of next instruction
 
      PARTS:
-     // Original output values
-     CPU(inM = inM, instruction = instruction, reset = reset, outM = ToutM, writeM = TwriteM, addressM = TaddressM, pc = Tpc);
-     //Calculating D*A/M for potential outcomes.
-     DRegister(in = false, load = false, out = Dval);
-     ARegister(in = false, load = false, out = Aval);
-     Mul(a = inM, b = Dval, out = DtimesM);
-     Mul(a = Aval, b = Dval, out = DtimesA);
-     //selecting potential multiplication D*A/M according to inst[12].
-     Mux16(a = DtimesA, b = DtimesM, sel = instruction[12], out = mulVal);
-
-     /* various control flow flags */
-     Not(in = instruction[15], out = flagI15);
-     And(a = instruction[14], b = instruction[13], out = flagI14AndI13);
-     // flag for returning original CPU output.
-     Or(a = flagI15, b = flagI14AndI13, out = flagOriginal);
-     And(a = instruction[15], b = true, out = flagCInst); //flag for C instruction.
-     Not(in = instruction[13], out = flagMul);
-     And(a = flagCInst, b = flagMul, out = flagDtimesAorM); // aka flag for D*A/M scenario.
-     Not(in = instruction[14], out = flagTable); // refering to the table behaviour.
-
-
-     /* bulding some possible calculations for the table behaviour */
-     ShiftLeft(in = Dval, out = DLeft);
-     ShiftLeft(in = Aval, out = ALeft);
-     ShiftLeft(in = inM, out = MLeft);
-     ShiftRight(in = Dval, out = DRight);
-     ShiftRight(in = Aval, out = ARight);
-     ShiftRight(in = inM, out = MRight);
-
-     /* Useful flags for writing on the various registers */
-     Or(a = instruction[12], b = instruction[10], out = a1); // mid calculation.
-     Not(in = a1, out = TflagWriteA); // Actually shifting A due to the table.
-     And(a = TflagWriteA, b = flagTable, out = flagWriteA); // asserting the ins[14] flag.
-     Not(in = instruction[12], out = N12); // mid calculatio.
-     And(a = N12, b = instruction[10], out = TflagWriteD); // Actually shifting D due to the table.
-     And(a = TflagWriteD, b = flagTable, out = flagWriteD); // asserting the ins[14] flag.
-     Not(in = instruction[10], out = N10); // mid calculation.
-     And(a = instruction[12] , b = N10, out = TflagWriteM); // Actually shifting M due to the table.
-     And(a = TflagWriteM, b = flagTable, out = flagWriteM); // asserting the ins[14] flag.
-
-     / * attempting to navigate this table */
-     Mux16(a = ShiftedAorD, b = ShiftedM, sel = instruction[12], out = ShiftedOutput); // holds the table value.
-     Mux16(a = ShiftedA, b = ShiftedD, sel = instruction[10], out = ShiftedAorD);
-     Mux16(a = ARight, b = ALeft, sel = instruction[11] ,out = ShiftedA);
-     Mux16(a = DRight, b = DLeft, sel = instruction[11], out = ShiftedD);
-     Mux16(a = MLeft, b = MRight, sel = instruction[11], out = ShiftedM);
-
-     /* Updating the registers values accordingly */
-     //TODO: solve the issue at compare line 100, D isn't fetching previous value.
-     //Possible arms race issue ( with the exsisting CPU access to A/D).
-     DRegister(in = ShiftedD, load = flagWriteD, out = Dout);
-     ARegister(in = ShiftedA, load = flagWriteA, out = Aout);
-     // Mux16(a = inM, b = ShiftedM, sel = flagWriteM, out = MoutAfterTable);
-
-     /* Control flow for proper output of this chip */
-     Mux16(a = TempOutputForM, b = ToutM, sel = flagOriginal, out = outM);
-     Mux16(a = TableOutput, b = mulVal, sel = flagDtimesAorM, out = TempOutputForM);
-     Mux16(a = inM, b = ShiftedOutput, sel = flagTable, out = TableOutput);
-     /* setting additional output arguments */
-     // TODO : check this values 
-     Mux16(a = Aout, b[15] = true, b[0..14] = TaddressM, sel = flagOriginal, out[0..14] = addressM);
-     And(a = true, b = TwriteM, out = writeM);
-     And16(a = true, b[15] = true, b[0..14] = Tpc, out[0..14] = pc);
-
+     //check instruction type (instruction[15] = 1 <=> cInstruction, aInstruction otherwise).
+	Xor(a = instruction[15], b = true, out = aInstruction);
+	Not(in = aInstruction, out = cInstruction);
+	
+	//We now need to check, whether we have 1. c instruction A = [some address] 
+	//and i mark it as cAinstruction, or 2. A instruction.
+	//both cases we need to move to the address.
+	//if its the case, instruction[5] = 1 and instruction[15] = 1
+	
+	//A instruction
+	And(a = cInstruction, b = instruction[5], out = cAinstruction);
+	Or(a = cAinstruction, b =  aInstruction, out = moveToA);
+	//So moveToA is now the loader for the ARegister chip
+	//We still need to mux the results with the ALUOutput, depending if its C - A instruction
+	Mux16(a = instruction, b = ALUOutput, sel = cAinstruction, out = register); 
+	//And now set the ARegister with the loader
+	ARegister(in = register, load = moveToA, out = Areg);
+	
+	//a OR m instruction
+	Mux16(a = Areg, b = inM, sel = instruction[12], out = AORM); 
+	
+	//D instruction
+	And(a = cInstruction, b = instruction[4], out = Dload);
+	DRegister(in = ALUOutput, load = Dload, out = Dout);
+	
+	//We gathered all inputs for ALU, now we can feed them and collect outputs
+	ExtendAlu(x = Dout, y = AORM, instruction = instruction[6..14], out = ALUOutput, zr = ALUZR, ng = ALUNG);
+    
+	//set outputs
+	And16(a = true, b = Areg, out[0..14] = addressM); //If A instruction (or cA instruction), set address
+	And16(a = true, b = ALUOutput, out = outM);       
+	And(a = cInstruction, b = instruction[3], out = writeM); //set write to M if instruction
+	
+	//manage instructions jumps (if cInstruction)
+	And(a = ALUZR, b = instruction[1], out = jeq); //set jeq if Alu Zero and instruction[1]
+	And(a = ALUNG, b = instruction[2], out = jng); //set jng if Alu Neg and instruction[2]
+	Or(a = ALUZR, b = ALUNG, out = negOrZero);    // check if ALU out was less or neg
+	Not(in = negOrZero, out = positive);         // negate it and know if positive
+	And(a = positive, b = instruction[0], out = jgt); // set jgt 
+	Or(a = jeq, b = jng, out = temp);  //Now just check whether any jump is needed
+	Or(a = temp, b = jgt, out = Ajump);
+	
+	//manage PC chip 
+	And(a = cInstruction, b = Ajump, out = loadPC); //Only if cInstruction PC will execute 
+	Not(in = loadPC, out = incPC); //incPC is always the opposite of loader for PC
+	PC(in = Areg, load = loadPC, inc = incPC, reset = reset, out[0..14] = pc); //execute PC chip
 }
