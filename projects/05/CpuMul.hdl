@@ -1,0 +1,97 @@
+/**
+* This chip is an extension of the book CPU by using the extended ALU.
+* More specificly if instruction[15]==0 or (instruction[14] and instruction[13] equals 1)
+* the CpuMul behave exactly as the book CPU.
+* While if it is C instruction and instruction[13] == 0 the output will be D*A/M 
+* (according to instruction[12]).
+* Moreover, if it is c instruction and instruction[14] == 0 it will behave as follows:
+*
+* instruction:  | 12 | 11 | 10 |
+* _____________________________
+* shift left D  | 0  | 1  | 1  |
+* shift left A  | 0  | 1  | 0  |
+* shift left M  | 1  | 1  | 0  |
+* shift right D | 0  | 0  | 1  |
+* shift right A | 0  | 0  | 0  |
+* shift right M | 1  | 0  | 0  |
+**/
+
+CHIP CpuMul{
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset=1) or continue executing
+                         // the current program (reset=0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write into M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+     PARTS:
+     // Original output values
+     CPU(inM = inM, instruction = instruction, reset = reset, outM = ToutM, writeM = TwriteM, addressM = TaddressM, pc = Tpc);
+     //Calculating D*A/M for potential outcomes.
+     DRegister(in = false, load = false, out = Dval);
+     ARegister(in = false, load = false, out = Aval);
+     Mul(a = inM, b = Dval, out = DtimesM);
+     Mul(a = Aval, b = Dval, out = DtimesA);
+     //selecting potential multiplication D*A/M according to inst[12].
+     Mux16(a = DtimesA, b = DtimesM, sel = instruction[12], out = mulVal);
+
+     /* various control flow flags */
+     Not(in = instruction[15], out = flagI15);
+     And(a = instruction[14], b = instruction[13], out = flagI14AndI13);
+     // flag for returning original CPU output.
+     Or(a = flagI15, b = flagI14AndI13, out = flagOriginal);
+     And(a = instruction[15], b = true, out = flagCInst); //flag for C instruction.
+     Not(in = instruction[13], out = flagMul);
+     And(a = flagCInst, b = flagMul, out = flagDtimesAorM); // aka flag for D*A/M scenario.
+     Not(in = instruction[14], out = flagTable); // refering to the table behaviour.
+
+
+     /* bulding some possible calculations for the table behaviour */
+     ShiftLeft(in = Dval, out = DLeft);
+     ShiftLeft(in = Aval, out = ALeft);
+     ShiftLeft(in = inM, out = MLeft);
+     ShiftRight(in = Dval, out = DRight);
+     ShiftRight(in = Aval, out = ARight);
+     ShiftRight(in = inM, out = MRight);
+
+     /* Useful flags for writing on the various registers */
+     Or(a = instruction[12], b = instruction[10], out = a1); // mid calculation.
+     Not(in = a1, out = TflagWriteA); // Actually shifting A due to the table.
+     And(a = TflagWriteA, b = flagTable, out = flagWriteA); // asserting the ins[14] flag.
+     Not(in = instruction[12], out = N12); // mid calculatio.
+     And(a = N12, b = instruction[10], out = TflagWriteD); // Actually shifting D due to the table.
+     And(a = TflagWriteD, b = flagTable, out = flagWriteD); // asserting the ins[14] flag.
+     Not(in = instruction[10], out = N10); // mid calculation.
+     And(a = instruction[12] , b = N10, out = TflagWriteM); // Actually shifting M due to the table.
+     And(a = TflagWriteM, b = flagTable, out = flagWriteM); // asserting the ins[14] flag.
+
+     / * attempting to navigate this table */
+     Mux16(a = ShiftedAorD, b = ShiftedM, sel = instruction[12], out = ShiftedOutput); // holds the table value.
+     Mux16(a = ShiftedA, b = ShiftedD, sel = instruction[10], out = ShiftedAorD);
+     Mux16(a = ARight, b = ALeft, sel = instruction[11] ,out = ShiftedA);
+     Mux16(a = DRight, b = DLeft, sel = instruction[11], out = ShiftedD);
+     Mux16(a = MLeft, b = MRight, sel = instruction[11], out = ShiftedM);
+
+     /* Updating the registers values accordingly */
+     //TODO: solve the issue at compare line 100, D isn't fetching previous value.
+     //Possible arms race issue ( with the exsisting CPU access to A/D).
+     DRegister(in = ShiftedD, load = flagWriteD, out = Dout);
+     ARegister(in = ShiftedA, load = flagWriteA, out = Aout);
+     // Mux16(a = inM, b = ShiftedM, sel = flagWriteM, out = MoutAfterTable);
+
+     /* Control flow for proper output of this chip */
+     Mux16(a = TempOutputForM, b = ToutM, sel = flagOriginal, out = outM);
+     Mux16(a = TableOutput, b = mulVal, sel = flagDtimesAorM, out = TempOutputForM);
+     Mux16(a = inM, b = ShiftedOutput, sel = flagTable, out = TableOutput);
+     /* setting additional output arguments */
+     // TODO : check this values 
+     Mux16(a = Aout, b[15] = true, b[0..14] = TaddressM, sel = flagOriginal, out[0..14] = addressM);
+     And(a = true, b = TwriteM, out = writeM);
+     And16(a = true, b[15] = true, b[0..14] = Tpc, out[0..14] = pc);
+
+}
