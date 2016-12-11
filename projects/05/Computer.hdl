@@ -19,5 +19,16 @@ CHIP Computer {
     IN reset;
 
     PARTS:
-    // Put your code here:
+	//we are creating a feedback between all components of the computer, Memory, ROM and CPU.
+	
+	// get outM, writeM and address (all 3 memory inputs) from CPU outputs
+	// and give CPU the memoryOUT accordingly
+	Memory(in = outM, load = writeM, address = addressM, out = memoryOut);
+	
+	//
+	CPU(inM = memoryOut, instruction = romInstruction, reset = reset, outM = outM,
+	writeM = writeM, addressM = addressM, pc = pcForRom);
+
+	//output the instruction stored in address
+	ROM32K(address = pcForRom, out = romInstruction);
 }
