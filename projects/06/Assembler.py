@@ -1,0 +1,252 @@
+import os
+import sys
+#declare globals
+sysInput = sys.argv[1]
+n = 16
+comp = {}
+dest = {}
+jump = {}
+table = {}
+def initializeNewTables():
+    """
+    This function initialize new tables, since we will write to many files and want to have a new table for each one
+    :return:
+    """
+    comp = {
+            "0" : "0101010",
+            "1" : "0111111",
+            "-1": "0111010",
+            "D": "0001100",
+            "A": "0110000",
+            "!D": "0001101",
+            "!A": "0110001",
+            "-D": "0001111",
+            "-A": "0110011",
+            "D+1": "0011111",
+            "A+1": "0110111",
+            "D-1": "0001110",
+            "A-1": "0110010",
+            "D+A": "0000010",
+            "D-A": "0010011",
+            "A-D": "0000111",
+            "D&A": "0000000",
+            "D|A": "0010101",
+            "M": "1110000",
+            "!M": "110001",
+            "-M": "1110011",
+            "M+1": "1110111",
+            "M-1": "1110010",
+            "D+M": "1000010",
+            "D-M": "1000010",
+            "M-D": "1000111",
+            "D&M": "1000000",
+            "D|M": "1010101",
+    }
+
+    dest = {
+        "null": "000",
+        "M": "001",
+        "D": "010",
+        "MD": "011",
+        "A": "100",
+        "AM": "101",
+        "AD": "110",
+        "AMD": "111",
+    }
+
+    jump = {
+        "null": "000",
+        "JGT": "001",
+        "JEQ": "010",
+        "JGE": "011",
+        "JLT": "100",
+        "JNE": "101",
+        "JLE": "110",
+        "JMP": "111",
+    }
+
+    table = {
+        "SP": 0,
+        "LCL": 1,
+        "ARG": 2,
+        "THIS": 3,
+        "THAT": 4,
+        "SCREEN": 16384,
+        "KBD": 24576,
+    }
+    #Initialize R0....R16
+    for i in range(0,16):
+        RI = "R" + str(i)
+        table[RI] = i
+
+def removeComments(f):
+    """
+    Get file f, return arrayOfLines with no comments, spaces and line breaks.
+    :param f:
+    :return: arrayOfLines
+    """
+    arrayOfLines = []
+    for line in iter(f):
+        if line.startswith("//"):
+            continue
+        elif "//" in line:
+            index = line.index("/")
+            lineWithoutComment = line[0:index]
+            lineWithoutSpaces = lineWithoutComment.replace(" ", "")
+            lineWithoutSpaces2 = lineWithoutSpaces.replace("\n", "")
+            arrayOfLines.append(lineWithoutSpaces2)
+        elif line.isspace():
+            continue
+        else:
+            lineWithoutSpaces = line.replace(" ","")
+            lineWithoutSpaces2 = lineWithoutSpaces.replace("\n", "")
+            arrayOfLines.append(lineWithoutSpaces2)
+    return arrayOfLines
+
+def labelDeclarations(lines):
+    """
+    This function adds lines like (LOOP) into the table and removes them
+    :param lines:
+    :return:
+    """
+    newLines = []
+    lineNum = 0 #Or should it be 1?!?!?!?!
+    for line in lines:
+        if line.startswith("("):
+            name = line[1:-1]
+            table[name] = lineNum
+        else:
+            lineNum += 1
+            newLines.append(line)
+    return newLines
+
+def createVariables(lines):
+    """
+    get array of lines, create the variables declared as @var
+    :param lines:
+    :return:
+    """
+    for line in lines:
+        global n
+        if line.startswith("@"):
+            varName = line[1:]
+            if varName in table:
+                continue
+            else:
+                def RepresentsInt(s):
+                    try:
+                        int(s)
+                        return True
+                    except ValueError:
+                        return False
+                isNum = RepresentsInt(varName)
+                if isNum:
+                    continue
+                else:
+                    table[varName] = n
+                    n = n + 1
+
+def changeVariablesToAdress(lines):
+    '''
+    This function gets the lines after variables are added to the table.
+    It simply replaces var with its actual memory address (@var ====> @16)
+    :param lines:
+    :return:
+    '''
+    replaced = []
+    for line in lines:
+        if line.startswith("@"):
+            var = line[1:]
+            if var in table:
+                replaced.append("@" + str(table[var]))
+            else:
+                replaced.append(line)
+        else:
+            replaced.append(line)
+    return replaced
+
+def aInstruction(line):
+    """
+    This gets a line that is already recognized as a instruction and turns it into binary 16 bit string
+    :param line:
+    :return b:
+    """
+    a = int(line[1:])
+    b = bin(a)[2:].zfill(16)
+    return str(0) + b
+
+def cInstruction(line):
+    """
+    This function assumes to get a c instruction, and returns the binary code for it
+    :param line:
+    :return b:
+    """
+    b = ""
+    if not "=" in line:
+        line = "null=" + line
+    if not ";" in line:
+        line = line + ";null"
+    tmp = line.split("=")
+    localDest = tmp[0]
+    tmp = tmp[1].split(";")
+
+    localComp = tmp[0]
+    localJump = tmp[1]
+    destB = dest[localDest]
+    compB = comp[localComp]
+    jumpB = jump[localJump]
+    b = str(destB) + str(compB) + str(jumpB)
+    return str(111) + b
+
+def codeToBinary(codeArray, file):
+    """
+    This function gets code and turns it into binary code
+    :param codeArray:
+    :return:
+    """
+    split = file.split(".")
+    fileName = split[0]
+    outputFile = open(fileName + ".hack", "w")
+    for code in codeArray:
+        if code.startsWith("@"):
+            outputFile.write(aInstruction(code) + "\n")
+        else:
+            outputFile.write(cInstruction(code) + "\n")
+
+def assembelOneFile(file):
+    """
+    get a file name and create the .hack file, using codeToBinary function
+    :param f:
+    :return:
+    """
+    f = open(file, "r")
+
+    initializeNewTables()
+    lines = removeComments(f)
+    lines = labelDeclarations(lines)
+    createVariables(lines)
+    replaced = changeVariablesToAdress(lines)
+    codeToBinary(replaced, file)
+
+def listAsmInDir(dir):
+    """
+    return all files in dir finish with .asm
+    :param dir:
+    :return:
+    """
+    files = []
+    for file in os.listdir(sysInput):
+        if file.endswith(".asm"):
+            files.append(file)
+    return files
+
+#if the path is a directory, look for asm files and create HACK file for each, otherwise create HACK for one file
+isDir = os.path.isDir(sysInput)
+if isDir:
+    listOfAsm = listAsmInDir(sysInput)
+    for file in listOfAsm:
+        assembelOneFile(file)
+else:
+    assembelOneFile(sysInput)
+
+
