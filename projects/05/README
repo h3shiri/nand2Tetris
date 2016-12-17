@@ -1,0 +1,24 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 5 - Building the hack computer platform.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+CPU.hdl - The basic processing unit.
+Computer.hdl - A basic computer chip.
+CpuMul.hdl - A modified CPU that allows few extra operations.
+EqZero16.hdl - A utility chip for the ExtendAlu chip.
+EqZero4.hdl - A utility chip for the ExtendAlu chip.
+ExtendAlu.hdl - An extended version of the Alu.
+Memory.hdl - A basic chip reresenting the memory space.
+
+Remarks
+-------
+* No special comments.
+

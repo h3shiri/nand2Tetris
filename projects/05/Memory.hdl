@@ -28,7 +28,11 @@ CHIP Memory {
 
     PARTS:
 	// Dmux the input according to the load and use the address last 2 bits as selector
+<<<<<<< HEAD
     DMux4Way(in = load, sel = address[13..14], a = load1, b = load2, c = sc, d = kb);
+=======
+    	DMux4Way(in = load, sel = address[13..14], a = load1, b = load2, c = sc, d = kb);
+>>>>>>> refs/remotes/origin/master
 	
 	//We actually divided the ram to 2 8k parts, so we or between them
 	Or(a = load1, b = load2, out = ram);
@@ -46,4 +50,8 @@ CHIP Memory {
 	//Now we simply select which of the components is actually relevant and output it.
 	Mux4Way16(a = ramoutput, b = ramoutput, c = scoutput, d = kboutput, sel = address[13..14], out = out);
 	
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> refs/remotes/origin/master
