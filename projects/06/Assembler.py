@@ -274,5 +274,6 @@ if __name__ == "__main__":
             fileWithRelativePath = (sysInput + "/" + file)
             assembelOneFile(fileWithRelativePath)
     else:
+        initializeNewTables()
         assembelOneFile(sysInput)
 

@@ -1,4 +1,4 @@
-#!/usr/bin/bash Python
+#!/usr/bin/env python3
 import os
 import sys
 #declare globals
@@ -260,6 +260,7 @@ def listAsmInDir(dir):
     return files
 
 if __name__ == "__main__":
+    # sysInput is the path input argument.
     n = 16
     comp = {}
     additionalComp = {}
@@ -275,5 +276,6 @@ if __name__ == "__main__":
             fileWithRelativePath = (sysInput + "/" + file)
             assembelOneFile(fileWithRelativePath)
     else:
+        initializeNewTables()
         assembelOneFile(sysInput)
 
