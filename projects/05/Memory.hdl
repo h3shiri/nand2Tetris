@@ -27,5 +27,23 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+	// Dmux the input according to the load and use the address last 2 bits as selector
+    DMux4Way(in = load, sel = address[13..14], a = load1, b = load2, c = sc, d = kb);
+	
+	//We actually divided the ram to 2 8k parts, so we or between them
+	Or(a = load1, b = load2, out = ram);
+	
+	//Now for each part of our memory, we will select its relevant output
+	//Since Ram needs 14 bit address as input,  we give address 1..14.
+	RAM16K(in = in, load = ram, address = address[0..13], out = ramoutput);
+	
+	//Same with screen, but needs 13 bit input (according to the screen built in chip).
+	Screen(in = in, load = sc, address = address[0..12], out = scoutput);
+	
+	//Nothing to choose in keyboard, only one register
+	Keyboard(out = kboutput);
+	
+	//Now we simply select which of the components is actually relevant and output it.
+	Mux4Way16(a = ramoutput, b = ramoutput, c = scoutput, d = kboutput, sel = address[13..14], out = out);
+	
 }

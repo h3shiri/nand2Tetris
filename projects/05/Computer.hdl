@@ -19,5 +19,6 @@ CHIP Computer {
     IN reset;
 
     PARTS:
-    // Put your code here:
+	Xor(a = reset, b = false, out = isReset); //if reset is 0, isReset will be 0
+	Not(in = isReset, out = isNotReset); //isNotReset is the negation
 }
