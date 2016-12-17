@@ -1,8 +1,18 @@
 #Ignoring the output files
 *.out
+*/*.out
 
 #Ignore comparison files
 *.cmp
+*/*.cmp
 
 #Ignore binary files outputs..etc
 *.hack
+*/*.hack
+
+#Ignoring test files
+*.tst
+*/*.tst
+
+#Random files that should be ignored
+../tools/bin/Hardware Simulator.dat
