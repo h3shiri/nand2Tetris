@@ -1,3 +1,4 @@
+#!/usr/bin/bash Python
 import os
 import sys
 #declare globals
