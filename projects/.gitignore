@@ -1,2 +1,8 @@
 #Ignoring the output files
 *.out
+
+#Ignore comparison files
+*.cmp
+
+#Ignore binary files outputs..etc
+*.hack
