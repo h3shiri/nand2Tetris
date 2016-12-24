@@ -10,7 +10,6 @@ class Parser:
     def __init__(self, fileToParse):
         #open the file first only to initialze self.fileLength to the file length
         self.file = open(fileToParse, 'r')
-        self.fileLength
         self.file.readlines()
         self.fileLength = self.file.tell()
         self.file.close()
@@ -44,7 +43,7 @@ class Parser:
         command = self.curCommand[0]
         if command == None:
             pass
-            #TO-DO: HOW WOULD WE HANDLE THIS? maybe pass is enough. NEED TO CHECK!
+            #TODO: HOW WOULD WE HANDLE THIS? maybe pass is enough. NEED TO CHECK!
         else:
             return command
 
@@ -62,20 +61,135 @@ class CodeWriter:
     def __init__(self, file):
         self.fileToWrite = open(file, 'w')
         self.begin = False
-        self.fileName = ''
+        self.fileName = (file + ".asm")
+        self.memoryDict = { # Navigating various segments of the RAM
+            "SP": 0, "LCL": 1, "ARG": 2, "THIS": 3, "THAT": 4,
+            "TEMP": 5, "STACK": 256
+        }
+        self.segmentsDict = {
+            "argument": "ARG", "local": "LCL", "constant": "", "this": "THIS", "that": "THAT", "pointer": "THIS",
+            "temp": "R5"
+        }
+        self.binaryOperationsDict = {
+            "add": "+", "sub": "-", "and": "&", "or": "|"
+        }
 
     def setFileName(self, fileName):
         self.begin = True
         self.fileName = fileName
 
     def writeArithmetic(self, command):
-        pass
+        if command in {"add", "sub", "and", "or"}:
+            operand = self.binaryOperationsDict[command]
+            self.binaryOperand(operand)
+        else:
+            #TODO: complete unary operands
+            pass
 
+    # A template for any binary operation using the stack top most 2 values.
+    def binaryOperand(self, operand):
+        self.insertAddress("SP")
+        # Probing the stack for the top value and decreasing the stack pointer.
+        self.passValue("MD", "M-1")
+        self.passValue("A", "D")
+        # loading the value to R14.
+        self.passValue("D", "M")
+        self.insertAddress("R14")
+        self.passValue("M", "D")
+        # Probing the stack for the top value (for the second argument).
+        self.insertAddress("SP")
+        self.passValue("D", "M-1")
+        self.passValue("A", "D")
+        # D register holds the second target value
+        self.passValue("D", "M")
+        self.insertAddress("R14")
+        self.passValue("D", "D" + operand + "M")
+        # res is currently stored in D register.
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("M", "D")
+
+
+    # Managment the pushing and the popping of the stack.
     def writePushPop(self, command, segment, index):
-        pass
+        if command == "push":
+            if segment == "constant":
+                self.insertAddress(index)
+                self.passValue("D", "A")
+
+            elif segment == "static":
+                pass
+
+            else:
+                pass
+
+            self.accessStack()
+            # Writing on the stack the given value.
+            self.passValue("M", "D")
+            self.incrementPointer()
+
+        elif command == "pop":
+            # Using a static variable
+            if segment == "static":
+                self.insertAddress(self.fileName + "." + index)
+                self.passValue("D", "M")
+            # popping a constant no actual stack retrieval
+            else:
+                register = self.segmentsDict[segment]
+                self.insertAddress(register)
+                if register in {"temp", "pointer"}:
+                    self.passValue("D", "A")
+                else:
+                    self.passValue("D", "M")
+                    #Storing the correct value in D including index offset.
+                    self.accessSegmentDataAddress(index)
+
+            # Storing relevant data address in R14
+            self.insertAddress("R14")
+            self.passValue("M", "D")
+            self.decrementPointer()
+            # Placing the top of the stack value in D
+            self.accessStack()
+            self.passValue("D", "M")
+            # Writing the relevant value into the segment memory
+            self.insertAddress("R14")
+            self.passValue("A", "M")
+            self.passValue("M", "D")
+
+        else:
+            return "Not callable this isn't a pop/push command"
+
+    #Writing an address currently occupying the A register.
+    def insertAddress(self, place):
+        self.fileToWrite.write("@" + str(place) + "\n")
+
+    #Passing value between registers
+    def passValue(self, dest, source):
+        self.fileToWrite.write(dest + "=" + source + "\n")
+
+    # Moving the stack pointer by one up (aka when pushing a value).
+    def incrementPointer(self):
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+
+    # Moving the pointer address one down
+    def decrementPointer(self):
+        self.insertAddress("SP")
+        self.passValue("M", "M-1")
+
+    # accessing the stack top address in (stored in A)
+    def accessStack(self):
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+
+    # Accessing a specific segments data , assuming Dregister holds beginning of segment location
+    def accessSegmentDataAddress(self, index):
+        self.insertAddress(index)
+        self.passValue("D", "D+A")
 
     def close(self):
         self.fileToWrite.close()
+
 
 def runOneFile(file):
     """
@@ -126,6 +240,15 @@ def main():
     else:
         runOneFile(sysInput)
 
+#TODO: remove this secondary main (used for unit testing) - passed
+def main2():
+    fileToParse = "/Users/shiri/PycharmProjects/nand2Tetris/ex7/StackArithmetic/SimpleAdd/SimpleAdd.vm"
+    fileToWriteInto = "SimpleAdd.asm"
+    codeWriter = CodeWriter(fileToWriteInto)
+    codeWriter.writePushPop("push", "constant", 7)
+    codeWriter.writePushPop("push" ,"constant", 8)
+    codeWriter.writeArithmetic("add")
+    file = open(fileToParse, 'r')
 
-
-if __name__ == '__main__': main()
+if __name__ == "__main__" :
+    main2()
