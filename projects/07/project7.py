@@ -15,7 +15,6 @@ class Parser:
         self.file.close()
         #Now open the file again for parsing, and initialize self.pos to 0
         self.file = open(fileToParse, "r")
-        self.pos = 0
         self.curCommand = []
         self.commandsDict = { #ca stands for C_ARITHMETIC
             'add': "ca", 'sub': "ca", 'neg': "ca", 'eq': "ca", 'gt': "ca", 'ls': "ca", 'and': "ca", 'or': "ca",
@@ -28,11 +27,10 @@ class Parser:
         boolean function checks if there are more commands
         :return:
         """
-        return  self.pos < self.fileLength
+        return  self.file.tell() < self.fileLength
 
     def advance(self):
         line = self.file.readline()
-        self.pos = self.file.seek()
         lineWithoutComments = line.split("/")[0]
         if len(lineWithoutComments) == 0:
             self.advance()
@@ -82,9 +80,12 @@ class CodeWriter:
         if command in {"add", "sub", "and", "or"}:
             operand = self.binaryOperationsDict[command]
             self.binaryOperand(operand)
-        else:
-            #TODO: complete unary operands
+        elif command in {"neg", "not"}:
+
             pass
+    #A template for unary operands
+    def unaryOperand(self, operand):
+        pass
 
     # A template for any binary operation using the stack top most 2 values.
     def binaryOperand(self, operand):
@@ -204,13 +205,11 @@ def runOneFile(file):
     while(parser.hasMoreCommands()):
         parser.advance()
         command = parser.commandType()
-        arg1 = parser.arg1()
-        arg2 = parser.arg2()
 
         if command == "ca":
-            codeWrite.writeArithmetic(arg1)
+            codeWrite.writeArithmetic(parser.arg1())
         elif command == "push" or command == "pop":
-            codeWrite.writePushPop(command, arg1, arg2)
+            codeWrite.writePushPop(command, parser.arg1(), parser.arg2())
         else:
             pass # More options in project 8
 
@@ -240,15 +239,6 @@ def main():
     else:
         runOneFile(sysInput)
 
-#TODO: remove this secondary main (used for unit testing) - passed
-def main2():
-    fileToParse = "/Users/shiri/PycharmProjects/nand2Tetris/ex7/StackArithmetic/SimpleAdd/SimpleAdd.vm"
-    fileToWriteInto = "SimpleAdd.asm"
-    codeWriter = CodeWriter(fileToWriteInto)
-    codeWriter.writePushPop("push", "constant", 7)
-    codeWriter.writePushPop("push" ,"constant", 8)
-    codeWriter.writeArithmetic("add")
-    file = open(fileToParse, 'r')
 
 if __name__ == "__main__" :
-    main2()
+    main()
