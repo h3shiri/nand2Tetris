@@ -59,7 +59,8 @@ class CodeWriter:
     def __init__(self, file):
         self.fileToWrite = open(file, 'w')
         self.begin = False
-        self.fileName = (file + ".asm")
+        #We need this parameter to be hust the name for further static refrences.
+        self.fileName = file 
         self.memoryDict = { # Navigating various segments of the RAM
             "SP": 0, "LCL": 1, "ARG": 2, "THIS": 3, "THAT": 4,
             "TEMP": 5, "STACK": 256
@@ -119,10 +120,23 @@ class CodeWriter:
                 self.passValue("D", "A")
 
             elif segment == "static":
-                pass
-
+            	# Imserting new static variable
+                self.insertAddress(self.fileName + "." + index)
+                self.passValue("D", "A")
             else:
-                pass
+            	# Writing to one of the other segments.
+            	register = self.segmentsDict[segment]
+                self.insertAddress(register)
+                if register in {"pointer", "temp"}:
+                	self.passValue("D", "A")
+                else:
+                	self.passValue("D", "M")
+                #Storing the correct value in D including index offset.
+                self.accessSegmentDataAddress(index)
+                #TODO: check there is no overflow / outOfBounds
+                self.passValue("A", "D")
+                self.passValue("D", "M")
+            
 
             self.accessStack()
             # Writing on the stack the given value.
@@ -142,8 +156,8 @@ class CodeWriter:
                     self.passValue("D", "A")
                 else:
                     self.passValue("D", "M")
-                    #Storing the correct value in D including index offset.
-                    self.accessSegmentDataAddress(index)
+                #Storing the correct value in D including index offset.
+                self.accessSegmentDataAddress(index)
 
             # Storing relevant data address in R14
             self.insertAddress("R14")
@@ -239,6 +253,13 @@ def main():
     else:
         runOneFile(sysInput)
 
+#TODO: made for internal testing - passed SimpleAdd
+def main2():
+	fileLocation = "/root/Projects/nand2Tetris/projects/07/StackArithmetic/SimpleAdd/SimpleAdd.vm"
+	codeWriter = CodeWriter("SimpleAdd")
+	codeWriter.writePushPop("push", "constant", 7)
+	codeWriter.writePushPop("push", "constant", 8)
+	codeWriter.writeArithmetic("add")
 
 if __name__ == "__main__" :
-    main()
+    main2()
