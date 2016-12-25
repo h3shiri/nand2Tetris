@@ -3,21 +3,23 @@ import os
 
 sysInput = sys.argv[1]
 
+
 class Parser:
     """
     Parser class as suggested in the project architecture
     """
+
     def __init__(self, fileToParse):
-        #open the file first only to initialze self.fileLength to the file length
+        # open the file first only to initialze self.fileLength to the file length
         self.file = open(fileToParse, 'r')
         self.file.readlines()
         self.fileLength = self.file.tell()
         self.file.close()
-        #Now open the file again for parsing, and initialize self.pos to 0
+        # Now open the file again for parsing, and initialize self.pos to 0
         self.file = open(fileToParse, "r")
         self.curCommand = []
-        self.commandsDict = { #ca stands for C_ARITHMETIC
-            'add': "ca", 'sub': "ca", 'neg': "ca", 'eq': "ca", 'gt': "ca", 'ls': "ca", 'and': "ca", 'or': "ca",
+        self.commandsDict = {  # ca stands for C_ARITHMETIC
+            'add': "ca", 'sub': "ca", 'neg': "ca", 'eq': "ca", 'gt': "ca", 'lt': "ca", 'and': "ca", 'or': "ca",
             'not': "ca",
             'push': "push", 'pop': "pop"
         }
@@ -27,11 +29,13 @@ class Parser:
         boolean function checks if there are more commands
         :return:
         """
-        return  self.file.tell() < self.fileLength
+        return self.file.tell() < self.fileLength
 
     def advance(self):
         line = self.file.readline()
-        lineWithoutComments = line.split("/")[0]
+        if len(line) == 0:
+            self.advance()
+        lineWithoutComments = line.split("/")[0].strip("\n")
         if len(lineWithoutComments) == 0:
             self.advance()
         else:
@@ -41,14 +45,18 @@ class Parser:
         command = self.curCommand[0]
         if command == None:
             pass
-            #TODO: HOW WOULD WE HANDLE THIS? maybe pass is enough. NEED TO CHECK!
+            # TODO: HOW WOULD WE HANDLE THIS? maybe pass is enough. NEED TO CHECK!
         else:
-            return command
+            return self.commandsDict[command.strip("\n")]
 
     def arg1(self):
+        if len(self.curCommand) < 2:
+            return None
         return self.curCommand[1]
 
     def arg2(self):
+        if len(self.curCommand) < 3:
+            return None
         return self.curCommand[2]
 
 
@@ -56,12 +64,13 @@ class CodeWriter:
     """
     CodeWriter class as suggested in the project architecture
     """
+
     def __init__(self, file):
-        self.fileToWrite = open(file, 'w')
+        self.fileToWrite = open(file+".asm", 'w')
         self.begin = False
-        #We need this parameter to be hust the name for further static refrences.
-        self.fileName = file 
-        self.memoryDict = { # Navigating various segments of the RAM
+        self.cur = 0
+        # We need this parameter to be hust the name for further static refrences.
+        self.memoryDict = {  # Navigating various segments of the RAM
             "SP": 0, "LCL": 1, "ARG": 2, "THIS": 3, "THAT": 4,
             "TEMP": 5, "STACK": 256
         }
@@ -72,21 +81,49 @@ class CodeWriter:
         self.binaryOperationsDict = {
             "add": "+", "sub": "-", "and": "&", "or": "|"
         }
-
+        self.compOperandDict = {
+            "lt": "JLT", "eq": "JEQ", "gt": "JGT"
+        }
     def setFileName(self, fileName):
         self.begin = True
         self.fileName = fileName
 
     def writeArithmetic(self, command):
+        command = command.strip("\n")
         if command in {"add", "sub", "and", "or"}:
             operand = self.binaryOperationsDict[command]
             self.binaryOperand(operand)
         elif command in {"neg", "not"}:
+            self.unaryOperand(command)
+        elif command in {"eq", "gt", "lt"}:
+            self.compOperand(self.compOperandDict[command])
 
-            pass
-    #A template for unary operands
-    def unaryOperand(self, operand):
-        pass
+    def compOperand(self, command):
+        cur = str(self.cur)
+        self.cur += 1
+        self.insertAddress("SP")
+        self.passValue("AM", "M-1")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("D", "M-D")
+        self.passValue("M", "-1")
+        self.insertAddress(command[1:]+ cur)
+        self.fileToWrite.write("D;"+command +"\n")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("M", "0")
+        self.fileToWrite.write("(" + command[1:] + cur + ")"+"\n")
+    # A template for unary operands
+    def unaryOperand(self, command):
+        if command == "neg":
+            self.insertAddress("SP")
+            self.passValue("A","M-1")
+            self.passValue("M", "-M")
+        elif command == "not":
+            self.insertAddress("SP")
+            self.passValue("A","M-1")
+            self.passValue("M", "!M")
 
     # A template for any binary operation using the stack top most 2 values.
     def binaryOperand(self, operand):
@@ -110,8 +147,6 @@ class CodeWriter:
         self.insertAddress("SP")
         self.passValue("A", "M-1")
         self.passValue("M", "D")
-
-
     # Managment the pushing and the popping of the stack.
     def writePushPop(self, command, segment, index):
         if command == "push":
@@ -120,23 +155,22 @@ class CodeWriter:
                 self.passValue("D", "A")
 
             elif segment == "static":
-            	# Imserting new static variable
+                # Imserting new static variable
                 self.insertAddress(self.fileName + "." + index)
                 self.passValue("D", "A")
             else:
-            	# Writing to one of the other segments.
-            	register = self.segmentsDict[segment]
+                # Writing to one of the other segments.
+                register = self.segmentsDict[segment]
                 self.insertAddress(register)
                 if register in {"pointer", "temp"}:
-                	self.passValue("D", "A")
+                    self.passValue("D", "A")
                 else:
-                	self.passValue("D", "M")
-                #Storing the correct value in D including index offset.
+                    self.passValue("D", "M")
+                # Storing the correct value in D including index offset.
                 self.accessSegmentDataAddress(index)
-                #TODO: check there is no overflow / outOfBounds
+                # TODO: check there is no overflow / outOfBounds
                 self.passValue("A", "D")
                 self.passValue("D", "M")
-            
 
             self.accessStack()
             # Writing on the stack the given value.
@@ -156,7 +190,7 @@ class CodeWriter:
                     self.passValue("D", "A")
                 else:
                     self.passValue("D", "M")
-                #Storing the correct value in D including index offset.
+                # Storing the correct value in D including index offset.
                 self.accessSegmentDataAddress(index)
 
             # Storing relevant data address in R14
@@ -174,11 +208,11 @@ class CodeWriter:
         else:
             return "Not callable this isn't a pop/push command"
 
-    #Writing an address currently occupying the A register.
+    # Writing an address currently occupying the A register.
     def insertAddress(self, place):
         self.fileToWrite.write("@" + str(place) + "\n")
 
-    #Passing value between registers
+    # Passing value between registers
     def passValue(self, dest, source):
         self.fileToWrite.write(dest + "=" + source + "\n")
 
@@ -213,19 +247,20 @@ def runOneFile(file):
     :return:
     """
     global sysInput
-    parser = Parser(file) #set a new Parser object with the input file
-    fileName = file.split('.vm')[0] #parse the name and give to a new CodeWriter
+    parser = Parser(file)  # set a new Parser object with the input file
+    fileName = file.split('.vm')[0]  # parse the name and give to a new CodeWriter
     codeWrite = CodeWriter(fileName)
-    while(parser.hasMoreCommands()):
+    while (parser.hasMoreCommands()):
         parser.advance()
-        command = parser.commandType()
-
-        if command == "ca":
-            codeWrite.writeArithmetic(parser.arg1())
-        elif command == "push" or command == "pop":
+        commandType = parser.commandType()
+        command = parser.curCommand[0]
+        if commandType == "ca":
+            codeWrite.writeArithmetic(command)
+        elif commandType == "push" or command == "pop":
             codeWrite.writePushPop(command, parser.arg1(), parser.arg2())
         else:
-            pass # More options in project 8
+            pass  # More options in project 8
+
 
 def main():
     """
@@ -233,6 +268,7 @@ def main():
     :return:
     """
     global sysInput
+
     def listVmInDir(dir):
         """
         Nested function to get the list of VM files(if its a directory)
@@ -253,13 +289,16 @@ def main():
     else:
         runOneFile(sysInput)
 
-#TODO: made for internal testing - passed SimpleAdd
+'''
+# TODO: made for internal testing - passed SimpleAdd
 def main2():
-	fileLocation = "/root/Projects/nand2Tetris/projects/07/StackArithmetic/SimpleAdd/SimpleAdd.vm"
-	codeWriter = CodeWriter("SimpleAdd")
-	codeWriter.writePushPop("push", "constant", 7)
-	codeWriter.writePushPop("push", "constant", 8)
-	codeWriter.writeArithmetic("add")
+    fileLocation = "/root/Projects/nand2Tetris/projects/07/StackArithmetic/SimpleAdd/SimpleAdd.vm"
+    codeWriter = CodeWriter("SimpleAdd")
+    codeWriter.writePushPop("push", "constant", 7)
+    codeWriter.writePushPop("push", "constant", 8)
+    codeWriter.writeArithmetic("add")
+'''
 
-if __name__ == "__main__" :
-    main2()
+#TODO: RUN TESTS IN CPUEmulator on the created ASM files.. check code on a directory.
+if __name__ == "__main__":
+    main()
