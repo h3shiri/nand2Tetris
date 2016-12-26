@@ -67,6 +67,8 @@ class CodeWriter:
 
     def __init__(self, file):
         self.fileToWrite = open(file+".asm", 'w')
+        #Important parameter for static variables. without any slashes such might ruin the assembly compilation.
+        self.fileName = file.split("/")[-1]
         self.begin = False
         self.cur = 0
         # We need this parameter to be hust the name for further static refrences.
@@ -160,7 +162,8 @@ class CodeWriter:
             elif segment == "static":
                 # Imserting new static variable
                 self.insertAddress(self.fileName + "." + index)
-                self.passValue("D", "A")
+                # Passing to D the relevant value.
+                self.passValue("D", "M")
             else:
                 # Writing to one of the other segments.
                 register = self.segmentsDict[segment]
@@ -251,7 +254,7 @@ def runOneFile(file):
     """
     global sysInput
     parser = Parser(file)  # set a new Parser object with the input file
-    fileName = file.split('.vm')[0]  # parse the name and give to a new CodeWriter
+    fileName = file.split('.vm')[0]  # parse the name and give to a new CodeWriter , including slashes //
     codeWrite = CodeWriter(fileName)
     while (parser.hasMoreCommands()):
         parser.advance()
