@@ -11,6 +11,7 @@ Submitted Files
 ---------------
 README - this file.
 VMtranslator - our compiler to jack implementation.
+Makefile - making our script executable.
 
 Remarks
 -------

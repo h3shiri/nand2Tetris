@@ -1,2 +1,2 @@
 all:
-	chmod +x Assembler
+	chmod +x VMtranslator
