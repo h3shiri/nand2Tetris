@@ -101,6 +101,8 @@ class CodeWriter:
     def compOperand(self, command):
         cur = str(self.cur)
         self.cur += 1
+        #label for jump operations.
+        label = command[1:]+ cur
         self.insertAddress("SP")
         self.passValue("AM", "M-1")
         self.passValue("D", "M")
@@ -108,12 +110,13 @@ class CodeWriter:
         self.passValue("A", "M-1")
         self.passValue("D", "M-D")
         self.passValue("M", "-1")
-        self.insertAddress(command[1:]+ cur)
-        self.fileToWrite.write("D;"+command +"\n")
+        self.insertAddress(label)
+        self.fileToWrite.write("D;" + command + "\n")
         self.insertAddress("SP")
         self.passValue("A", "M-1")
         self.passValue("M", "0")
-        self.fileToWrite.write("(" + command[1:] + cur + ")"+"\n")
+        self.fileToWrite.write("(" + label + ")" + "\n")
+
     # A template for unary operands
     def unaryOperand(self, command):
         if command == "neg":
@@ -162,7 +165,7 @@ class CodeWriter:
                 # Writing to one of the other segments.
                 register = self.segmentsDict[segment]
                 self.insertAddress(register)
-                if register in {"pointer", "temp"}:
+                if segment in {"pointer", "temp"}:
                     self.passValue("D", "A")
                 else:
                     self.passValue("D", "M")
@@ -186,7 +189,7 @@ class CodeWriter:
             else:
                 register = self.segmentsDict[segment]
                 self.insertAddress(register)
-                if register in {"temp", "pointer"}:
+                if segment in {"temp", "pointer"}:
                     self.passValue("D", "A")
                 else:
                     self.passValue("D", "M")
