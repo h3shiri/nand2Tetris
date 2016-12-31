@@ -4,13 +4,12 @@ import sys
 import os
 
 sysInput = sys.argv[1]
-
+initFlag = True
 
 class Parser:
     """
     Parser class as suggested in the project architecture
     """
-
     def __init__(self, fileToParse):
         # open the file first only to initialze self.fileLength to the file length
         self.file = open(fileToParse, 'r')
@@ -73,7 +72,6 @@ class CodeWriter:
     """
     CodeWriter class as suggested in the project architecture
     """
-
     def __init__(self, file):
         self.fileToWrite = open(file + ".asm", 'w')
         # Important parameter for static variables. without any slashes such might ruin the assembly compilation.
@@ -268,12 +266,14 @@ class CodeWriter:
 
     # FROM HERE IT'S PROJECT 8
     def writeInit(self):
+        #check this only appears only once (aka for one file in the directory).
         self.writeComment("Write init")
         self.insertAddress("256")
         self.passValue("D", "A")
         self.insertAddress("SP")
         self.passValue("M", "D")
-        self.writeCall("Sys.init", 0)  # Initialized SP, now call func Sys.init
+        # Initialized SP, now call func Sys.init
+        self.writeCall("Sys.init", 0)  
 
     def writeLabel(self, label):
         self.writeComment("label " + label)
@@ -413,9 +413,14 @@ def runOneFile(file):
     :return:
     """
     global sysInput
+    global initFlag
     parser = Parser(file)  # set a new Parser object with the input file
     fileName = file.split('.vm')[0]  # parse the name and give to a new CodeWriter , including slashes //
     codeWrite = CodeWriter(fileName)
+    # Inserting the bottsrapping to the first file.
+    if initFlag:
+        codeWrite.writeInit()
+        initFlag = False
     while (parser.hasMoreCommands()):
         parser.advance()
         commandType = parser.commandType()
@@ -449,6 +454,28 @@ def listVmInDir(dir):
             files.append(file)
     return files
 
+def listResAsmInDir(dir):
+    """
+    function that get the list of asm files(if its a directory)
+    :param dir:
+    :return:
+    """
+    files = []
+    for file in os.listdir(sysInput):
+        if file.endswith(".asm"):
+            files.append(sysInput + file)
+    return files
+
+# Bootsrapping all the files into one file with the directory name.
+def bootsrap(directoryName):
+    listOfAsm = listResAsmInDir(sysInput)
+    directoryOutput = (sysInput + directoryName + ".asm")
+    with open(directoryOutput, 'w') as fileToWrite:
+        for inFile in listOfAsm:
+            with open(inFile) as inputFile:
+                fileToWrite.write(inputFile.read())
+
+
 def main():
     """
     Main program, check if input is a directory or just a vm file, and perform the task on files/file.
@@ -462,6 +489,10 @@ def main():
         for file in listOfVm:
             fileWithRelativePath = (sysInput + "/" + file)
             runOneFile(fileWithRelativePath)
+        directoryName = sysInput.split("/")[-2]
+        # This make sure we only have the bootstrap code in one file (the first)
+        bootsrap(directoryName)
+
     else:
         runOneFile(sysInput)
 
