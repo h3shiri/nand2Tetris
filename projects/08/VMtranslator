@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+sysInput = sys.argv[1]
+
+
+class Parser:
+    """
+    Parser class as suggested in the project architecture
+    """
+
+    def __init__(self, fileToParse):
+        # open the file first only to initialze self.fileLength to the file length
+        self.file = open(fileToParse, 'r')
+        self.file.readlines()
+        self.fileLength = self.file.tell()
+        self.file.close()
+        # Now open the file again for parsing, and initialize self.pos to 0
+        self.file = open(fileToParse, "r")
+        self.curCommand = []
+        self.commandsDict = {  # ca stands for C_ARITHMETIC
+            'add': "ca", 'sub': "ca", 'neg': "ca", 'eq': "ca", 'gt': "ca", 'lt': "ca", 'and': "ca", 'or': "ca",
+            'not': "ca",
+            'push': "push",
+            'pop': "pop",
+            'label': "cl",
+            'goto': 'goto',
+            'if-goto': 'cig',
+            'call': 'cc',
+            'return': 'cr',
+            'function': 'cf'
+        }
+
+    def hasMoreCommands(self):
+        """
+        boolean function checks if there are more commands
+        :return:
+        """
+        return self.file.tell() < self.fileLength
+
+    def advance(self):
+        line = self.file.readline()
+        if len(line) == 0:
+            self.advance()
+        lineWithoutComments = line.split("/")[0].strip("\n")
+        if len(lineWithoutComments) == 0:
+            self.advance()
+        else:
+            self.curCommand = lineWithoutComments.split(" ")
+
+    def commandType(self):
+        command = self.curCommand[0]
+        if command == None:
+            pass
+            # TODO: HOW WOULD WE HANDLE THIS? maybe pass is enough. NEED TO CHECK!
+        else:
+            return self.commandsDict[command.strip("\n")]
+
+    def arg1(self):
+        if len(self.curCommand) < 2:
+            return None
+        return self.curCommand[1]
+
+    def arg2(self):
+        if len(self.curCommand) < 3:
+            return None
+        return self.curCommand[2]
+
+
+class CodeWriter:
+    """
+    CodeWriter class as suggested in the project architecture
+    """
+
+    def __init__(self, file):
+        self.fileToWrite = open(file + ".asm", 'w')
+        # Important parameter for static variables. without any slashes such might ruin the assembly compilation.
+        self.fileName = file.split("/")[-1]
+        self.begin = False
+        self.cur = 0
+        self.func = ""
+        # We need this parameter to be hust the name for further static refrences.
+        self.memoryDict = {  # Navigating various segments of the RAM
+            "SP": 0, "LCL": 1, "ARG": 2, "THIS": 3, "THAT": 4,
+            "TEMP": 5, "STACK": 256
+        }
+        self.segmentsDict = {
+            "argument": "ARG", "local": "LCL", "constant": "", "this": "THIS", "that": "THAT", "pointer": "THIS",
+            "temp": "R5"
+        }
+        self.binaryOperationsDict = {
+            "add": "+", "sub": "-", "and": "&", "or": "|"
+        }
+        self.compOperandDict = {
+            "lt": "JLT", "eq": "JEQ", "gt": "JGT"
+        }
+
+    def writeComment(self, comment):
+        self.fileToWrite.write("//" +comment + "\n")
+
+    def setFileName(self, fileName):
+        self.begin = True
+        self.fileName = fileName
+
+    def writeArithmetic(self, command):
+        command = command.strip("\n")
+        if command in {"add", "sub", "and", "or"}:
+            operand = self.binaryOperationsDict[command]
+            self.binaryOperand(operand)
+        elif command in {"neg", "not"}:
+            self.unaryOperand(command)
+        elif command in {"eq", "gt", "lt"}:
+            self.compOperand(self.compOperandDict[command])
+
+    def compOperand(self, command):
+        self.writeComment("Comparison operand with command " + command)
+        cur = str(self.cur)
+        self.cur += 1
+        # label for jump operations.
+        label = command[1:] + cur
+        self.insertAddress("SP")
+        self.passValue("AM", "M-1")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("D", "M-D")
+        self.passValue("M", "-1")
+        self.insertAddress(label)
+        self.fileToWrite.write("D;" + command + "\n")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("M", "0")
+        self.fileToWrite.write("(" + label + ")" + "\n")
+
+    # A template for unary operands
+    def unaryOperand(self, command):
+        self.writeComment(command)
+        if command == "neg":
+            self.insertAddress("SP")
+            self.passValue("A", "M-1")
+            self.passValue("M", "-M")
+        elif command == "not":
+            self.insertAddress("SP")
+            self.passValue("A", "M-1")
+            self.passValue("M", "!M")
+
+    # A template for any binary operation using the stack top most 2 values.
+    def binaryOperand(self, operand):
+        self.writeComment(operand)
+        self.insertAddress("SP")
+        # Probing the stack for the top value and decreasing the stack pointer.
+        self.passValue("MD", "M-1")
+        self.passValue("A", "D")
+        # loading the value to R14.
+        self.passValue("D", "M")
+        self.insertAddress("R14")
+        self.passValue("M", "D")
+        # Probing the stack for the top value (for the second argument).
+        self.insertAddress("SP")
+        self.passValue("D", "M-1")
+        self.passValue("A", "D")
+        # D register holds the second target value
+        self.passValue("D", "M")
+        self.insertAddress("R14")
+        self.passValue("D", "D" + operand + "M")
+        # res is currently stored in D register.
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("M", "D")
+
+    # Managment the pushing and the popping of the stack.
+    def writePushPop(self, command, segment, index):
+        self.writeComment(command + " " + segment + " " + index)
+        if command == "push":
+            if segment == "constant":
+                self.insertAddress(index)
+                self.passValue("D", "A")
+
+            elif segment == "static":
+                # Imserting new static variable
+                self.insertAddress(self.fileName + "." + index)
+                # Passing to D the relevant value.
+                self.passValue("D", "M")
+            else:
+                # Writing to one of the other segments.
+                register = self.segmentsDict[segment]
+                self.insertAddress(register)
+                if segment in {"pointer", "temp"}:
+                    self.passValue("D", "A")
+                else:
+                    self.passValue("D", "M")
+                # Storing the correct value in D including index offset.
+                self.accessSegmentDataAddress(index)
+                # TODO: check there is no overflow / outOfBounds
+                self.passValue("A", "D")
+                self.passValue("D", "M")
+
+            self.accessStack()
+            # Writing on the stack the given value.
+            self.passValue("M", "D")
+            self.incrementPointer()
+
+        elif command == "pop":
+            # Using a static variable
+            if segment == "static":
+                # Writing to D the relevant static address.
+                self.insertAddress(self.fileName + "." + index)
+                self.passValue("D", "A")
+
+            else:
+                # popping a constant no actual stack retrieval
+                register = self.segmentsDict[segment]
+                self.insertAddress(register)
+                if segment in {"temp", "pointer"}:
+                    self.passValue("D", "A")
+                else:
+                    self.passValue("D", "M")
+                # Storing the correct value in D including index offset.
+                self.accessSegmentDataAddress(index)
+
+            # Storing relevant data address in R14
+            self.insertAddress("R14")
+            self.passValue("M", "D")
+            self.decrementPointer()
+            # Placing the top of the stack value in D
+            self.accessStack()
+            self.passValue("D", "M")
+            # Writing the relevant value into the segment memory
+            self.insertAddress("R14")
+            self.passValue("A", "M")
+            self.passValue("M", "D")
+
+        else:
+            return "Not callable this isn't a pop/push command"
+
+    # Writing an address currently occupying the A register.
+    def insertAddress(self, place):
+        self.fileToWrite.write("@" + str(place) + "\n")
+
+    # Passing value between registers
+    def passValue(self, dest, source):
+        self.fileToWrite.write(dest + "=" + source + "\n")
+
+    # Moving the stack pointer by one up (aka when pushing a value).
+    def incrementPointer(self):
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+
+    # Moving the pointer address one down
+    def decrementPointer(self):
+        self.insertAddress("SP")
+        self.passValue("M", "M-1")
+
+    # accessing the stack top address in (stored in A)
+    def accessStack(self):
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+
+    # Accessing a specific segments data , assuming Dregister holds beginning of segment location
+    def accessSegmentDataAddress(self, index):
+        self.insertAddress(index)
+        self.passValue("D", "D+A")
+
+    def close(self):
+        self.fileToWrite.close()
+
+    # FROM HERE IT'S PROJECT 8
+    def writeInit(self):
+        self.writeComment("Write init")
+        self.insertAddress("256")
+        self.passValue("D", "A")
+        self.insertAddress("SP")
+        self.passValue("M", "D")
+        self.writeCall("Sys.init", 0)  # Initialized SP, now call func Sys.init
+
+    def writeLabel(self, label):
+        self.writeComment("label " + label)
+        self.fileToWrite.write("(" + label + ")\n")
+
+    def writeGoto(self, label):
+        self.writeComment("goto " + label)
+        self.insertAddress(label)
+        self.fileToWrite.write("0;JEQ\n")
+
+    def writeIf(self, label):
+        self.writeComment("if-goto " + label)
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("M", "M-1")
+        self.fileToWrite.write("@" + label + "\n")
+        self.fileToWrite.write("D;JNE\n")
+
+    #from here until writeCall, helper functions for writing assembly
+    def declareFunc(self, functionName):
+        self.writeComment("Declare func " + functionName)
+        self.fileToWrite.write("@retAdd" + functionName + str(self.cur) + "\n")
+
+    def funcParenthesis(self, functionName):
+        self.fileToWrite.write("(retAdd" + functionName + str(self.cur) + ")\n")
+
+    def functionMemorySegment(self, segment):
+        self.fileToWrite.write("@" + segment + "\n")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+
+
+    def writeCall(self, functionName, numArgs):
+        self.writeComment(functionName +  " " + str(numArgs))
+        self.declareFunc(functionName)
+        self.passValue("D", "A")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+        self.functionMemorySegment("LCL")
+        self.functionMemorySegment("ARG")
+        self.functionMemorySegment("THIS")
+        self.functionMemorySegment("THAT")
+        self.fileToWrite.write("@" + str(numArgs))
+        self.passValue("D", "A")
+        self.insertAddress("SP")
+        self.passValue("D", "M-D")
+        self.insertAddress("5")
+        self.passValue("D", "D-A")
+        self.insertAddress("ARG")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("D", "M")
+        self.insertAddress("LCL")
+        self.passValue("M", "D")
+        self.insertAddress(functionName)
+        self.funcParenthesis(functionName)
+        self.cur += 1
+
+    #helpers for write return
+    def restoreCallerSegment(self, segment, num):
+        self.insertAddress(str(num))
+        self.passValue("D", "A")
+        self.insertAddress("TEMP")
+        self.passValue("A", "M-D")
+        self.passValue("D", "M")
+        self.insertAddress(segment)
+        self.passValue("M", "D")
+
+    def writeReturn(self):
+        self.writeComment("Return from function " + self.func)
+        self.insertAddress("LCL")
+        self.passValue("D", "M")
+        self.insertAddress("TEMP")
+        self.passValue("M", "D")
+        self.insertAddress("5")
+        self.passValue("D", "A")
+        self.insertAddress("TEMP")
+        self.passValue("D", "M-D")
+        self.passValue("A", "D")
+        self.passValue("D", "M")
+        self.insertAddress("retAdd")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("D", "M")
+        self.insertAddress("ARG")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("ARG")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("M", "D+1")
+        self.restoreCallerSegment("THAT", 1)
+        self.restoreCallerSegment("THIS", 2)
+        self.restoreCallerSegment("ARG", 3)
+        self.restoreCallerSegment("LCL", 4)
+        self.insertAddress("retAdd")
+        self.passValue("A", "M")
+        self.fileToWrite.write("0;JEQ\n")
+
+
+
+    def writeFunction(self, functionName, numlocals):
+        self.writeComment("function " + functionName + " " + str(numlocals))
+        self.fileToWrite.write("(" + functionName + ")\n")
+        self.insertAddress(str(numlocals))
+        self.passValue("D", "A")
+        self.insertAddress(functionName +"_END")
+        self.fileToWrite.write("D;JLE\n")
+        self.fileToWrite.write("(" + functionName + "_START)\n")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "0")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+        self.passValue("D", "D-1")
+        self.insertAddress(functionName + "_START")
+        self.fileToWrite.write("D;JGT\n")
+        self.fileToWrite.write("(" + functionName + "_END)\n")
+        self.func = functionName
+
+
+
+def runOneFile(file):
+    """
+    This function creates 1 asm file out of a vm file.
+    :param file:
+    :return:
+    """
+    global sysInput
+    parser = Parser(file)  # set a new Parser object with the input file
+    fileName = file.split('.vm')[0]  # parse the name and give to a new CodeWriter , including slashes //
+    codeWrite = CodeWriter(fileName)
+    while (parser.hasMoreCommands()):
+        parser.advance()
+        commandType = parser.commandType()
+        command = parser.curCommand[0]
+        if commandType == "ca":
+            codeWrite.writeArithmetic(command)
+        elif commandType == "push" or command == "pop":
+            codeWrite.writePushPop(command, parser.arg1(), parser.arg2())
+        elif commandType == "cl": #Command label
+            codeWrite.writeLabel(parser.arg1())
+        elif commandType == "cig": #command if-goto
+            codeWrite.writeIf(parser.arg1())
+        elif commandType == "goto":
+            codeWrite.writeGoto(parser.arg1())
+        elif commandType == "cf":#c function
+            codeWrite.writeFunction(parser.arg1(), parser.arg2())
+        elif commandType == "cc": #command call
+            codeWrite.writeCall(parser.arg1(), parser.arg2())
+        elif commandType == "cr": #command return
+            codeWrite.writeReturn()
+
+def listVmInDir(dir):
+    """
+    function that get the list of VM files(if its a directory)
+    :param dir:
+    :return:
+    """
+    files = []
+    for file in os.listdir(sysInput):
+        if file.endswith(".vm"):
+            files.append(file)
+    return files
+
+def main():
+    """
+    Main program, check if input is a directory or just a vm file, and perform the task on files/file.
+    :return:
+    """
+    global sysInput
+
+    isDir = os.path.isdir(sysInput)
+    if isDir:
+        listOfVm = listVmInDir(sysInput)
+        for file in listOfVm:
+            fileWithRelativePath = (sysInput + "/" + file)
+            runOneFile(fileWithRelativePath)
+    else:
+        runOneFile(sysInput)
+
+if __name__ == "__main__":
+    main()
