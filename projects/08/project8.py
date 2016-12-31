@@ -97,6 +97,7 @@ class CodeWriter:
 
     def writeComment(self, comment):
         self.fileToWrite.write("//" +comment + "\n")
+
     def setFileName(self, fileName):
         self.begin = True
         self.fileName = fileName
@@ -270,14 +271,14 @@ class CodeWriter:
         self.passValue("D", "A")
         self.insertAddress("SP")
         self.passValue("M", "D")
-        self.writeCall("Sys.init", 0) #Initialized SP, now call func Sys.init
+        self.writeCall("Sys.init", 0)  # Initialized SP, now call func Sys.init
 
     def writeLabel(self, label):
         self.writeComment("label " + label)
         self.fileToWrite.write("(" + label + ")\n")
 
     def writeGoto(self, label):
-        self.writeComment("goto "+ label)
+        self.writeComment("goto " + label)
         self.insertAddress(label)
         self.fileToWrite.write("0;JEQ\n")
 
@@ -291,14 +292,116 @@ class CodeWriter:
         self.fileToWrite.write("@" + label + "\n")
         self.fileToWrite.write("D;JNE\n")
 
+    #from here until writeCall, helper functions for writing assembly
+    def declareFunc(self, functionName):
+        self.writeComment("Declare func " + functionName)
+        self.fileToWrite.write("@retAdd" + functionName + str(self.cur) + "\n")
+
+    def funcParenthesis(self, functionName):
+        self.fileToWrite.write("(retAdd" + functionName + str(self.cur) + ")\n")
+
+    def functionMemorySegment(self, segment):
+        self.fileToWrite.write("@" + segment + "\n")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+
+
     def writeCall(self, functionName, numArgs):
-        pass
+        self.writeComment(functionName +  " " + str(numArgs))
+        self.declareFunc(functionName)
+        self.passValue("D", "A")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+        self.functionMemorySegment("LCL")
+        self.functionMemorySegment("ARG")
+        self.functionMemorySegment("THIS")
+        self.functionMemorySegment("THAT")
+        self.fileToWrite.write("@" + str(numArgs))
+        self.passValue("D", "A")
+        self.insertAddress("SP")
+        self.passValue("D", "M-D")
+        self.insertAddress("5")
+        self.passValue("D", "D-A")
+        self.insertAddress("ARG")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("D", "M")
+        self.insertAddress("LCL")
+        self.passValue("M", "D")
+        self.insertAddress(functionName)
+        self.funcParenthesis(functionName)
+        self.cur += 1
+
+    #helpers for write return
+    def restoreCallerSegment(self, segment, num):
+        self.insertAddress(str(num))
+        self.passValue("D", "A")
+        self.insertAddress("TEMP")
+        self.passValue("A", "M-D")
+        self.passValue("D", "M")
+        self.insertAddress(segment)
+        self.passValue("M", "D")
 
     def writeReturn(self):
-        pass
+        self.writeComment("Return from function " + self.func)
+        self.insertAddress("LCL")
+        self.passValue("D", "M")
+        self.insertAddress("TEMP")
+        self.passValue("M", "D")
+        self.insertAddress("5")
+        self.passValue("D", "A")
+        self.insertAddress("TEMP")
+        self.passValue("D", "M-D")
+        self.passValue("A", "D")
+        self.passValue("D", "M")
+        self.insertAddress("retAdd")
+        self.passValue("M", "D")
+        self.insertAddress("SP")
+        self.passValue("A", "M-1")
+        self.passValue("D", "M")
+        self.insertAddress("ARG")
+        self.passValue("A", "M")
+        self.passValue("M", "D")
+        self.insertAddress("ARG")
+        self.passValue("D", "M")
+        self.insertAddress("SP")
+        self.passValue("M", "D+1")
+        self.restoreCallerSegment("THAT", 1)
+        self.restoreCallerSegment("THIS", 2)
+        self.restoreCallerSegment("ARG", 3)
+        self.restoreCallerSegment("LCL", 4)
+        self.insertAddress("retAdd")
+        self.passValue("A", "M")
+        self.fileToWrite.write("0;JEQ\n")
+
+
 
     def writeFunction(self, functionName, numlocals):
-        pass
+        self.writeComment("function " + functionName + " " + str(numlocals))
+        self.fileToWrite.write("(" + functionName + ")\n")
+        self.insertAddress(str(numlocals))
+        self.passValue("D", "A")
+        self.insertAddress(functionName +"_END")
+        self.fileToWrite.write("D;JLE\n")
+        self.fileToWrite.write("(" + functionName + "_START)\n")
+        self.insertAddress("SP")
+        self.passValue("A", "M")
+        self.passValue("M", "0")
+        self.insertAddress("SP")
+        self.passValue("M", "M+1")
+        self.passValue("D", "D-1")
+        self.insertAddress(functionName + "_START")
+        self.fileToWrite.write("D;JGT\n")
+        self.fileToWrite.write("(" + functionName + "_END)\n")
+        self.func = functionName
+
 
 
 def runOneFile(file):
@@ -325,7 +428,7 @@ def runOneFile(file):
             codeWrite.writeIf(parser.arg1())
         elif commandType == "goto":
             codeWrite.writeGoto(parser.arg1())
-        elif commandType == "cf": #c function
+        elif commandType == "cf":#c function
             codeWrite.writeFunction(parser.arg1(), parser.arg2())
         elif commandType == "cc": #command call
             codeWrite.writeCall(parser.arg1(), parser.arg2())
