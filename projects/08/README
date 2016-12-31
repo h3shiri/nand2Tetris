@@ -1,0 +1,19 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 8 - Building the jack compiler part II.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+VMtranslator - our compiler to jack implementation inclusing bootstrap.
+Makefile - making our script executable.
+
+Remarks
+-------
+* No special comments.
+

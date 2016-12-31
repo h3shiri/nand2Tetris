@@ -9,7 +9,7 @@ class Parser:
     """
     Parser class as suggested in the project architecture
     """
-
+    #Need to insert absolute/relative path so we open the relevant file always.
     def __init__(self, fileToParse):
         # open the file first only to initialze self.fileLength to the file length
         self.file = open(fileToParse, 'r')
@@ -268,6 +268,17 @@ def runOneFile(file):
         else:
             pass  # More options in project 8
 
+def listVmInDir(dir):
+    """
+    function to get the list of VM files(if its a directory)
+    :param dir:
+    :return:
+    """
+    files = []
+    for file in os.listdir(sysInput):
+        if file.endswith(".vm"):
+            files.append(file)
+    return files
 
 def main():
     """
@@ -275,24 +286,12 @@ def main():
     :return:
     """
     global sysInput
-
-    def listVmInDir(dir):
-        """
-        Nested function to get the list of VM files(if its a directory)
-        :param dir:
-        :return:
-        """
-        files = []
-        for file in os.listdir(sysInput):
-            if file.endswith(".vm"):
-                files.append(file)
-        return files
-
     isDir = os.path.isdir(sysInput)
     if isDir:
         listOfVm = listVmInDir(sysInput)
         for file in listOfVm:
-            runOneFile(file)
+            fileWithRelativePath = (sysInput + "/" + file)
+            runOneFile(fileWithRelativePath)
     else:
         runOneFile(sysInput)
 
