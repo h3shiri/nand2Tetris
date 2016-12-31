@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import os
 
@@ -435,6 +437,18 @@ def runOneFile(file):
         elif commandType == "cr": #command return
             codeWrite.writeReturn()
 
+def listVmInDir(dir):
+    """
+    function that get the list of VM files(if its a directory)
+    :param dir:
+    :return:
+    """
+    files = []
+    for file in os.listdir(sysInput):
+        if file.endswith(".vm"):
+            files.append(file)
+    return files
+
 def main():
     """
     Main program, check if input is a directory or just a vm file, and perform the task on files/file.
@@ -442,26 +456,14 @@ def main():
     """
     global sysInput
 
-    def listVmInDir(dir):
-        """
-        Nested function to get the list of VM files(if its a directory)
-        :param dir:
-        :return:
-        """
-        files = []
-        for file in os.listdir(sysInput):
-            if file.endswith(".vm"):
-                files.append(file)
-        return files
-
     isDir = os.path.isdir(sysInput)
     if isDir:
         listOfVm = listVmInDir(sysInput)
         for file in listOfVm:
-            runOneFile(file)
+            fileWithRelativePath = (sysInput + "/" + file)
+            runOneFile(fileWithRelativePath)
     else:
         runOneFile(sysInput)
-
 
 '''
 # TODO: made for internal testing - passed SimpleAdd
@@ -473,6 +475,5 @@ def main2():
     codeWriter.writeArithmetic("add")
 '''
 
-# TODO: RUN TESTS IN CPUEmulator on the created ASM files.. check code on a directory.
 if __name__ == "__main__":
     main()
