@@ -325,7 +325,8 @@ class CodeWriter:
         self.functionMemorySegment("ARG")
         self.functionMemorySegment("THIS")
         self.functionMemorySegment("THAT")
-        self.fileToWrite.write("@" + str(numArgs))
+        # TODO : check required behaviour.
+        self.insertAddress(str(numArgs))
         self.passValue("D", "A")
         self.insertAddress("SP")
         self.passValue("D", "M-D")
