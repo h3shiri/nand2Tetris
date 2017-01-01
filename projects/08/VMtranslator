@@ -4,7 +4,7 @@ import sys
 import os
 
 sysInput = sys.argv[1]
-initFlag = True
+initFlag = False
 
 class Parser:
     """
@@ -273,7 +273,7 @@ class CodeWriter:
         self.insertAddress("SP")
         self.passValue("M", "D")
         # Initialized SP, now call func Sys.init
-        self.writeCall("Sys.init", 0)  
+        self.writeCall("Sys.init", 0)
 
     def writeLabel(self, label):
         self.writeComment("label " + label)
@@ -339,6 +339,7 @@ class CodeWriter:
         self.insertAddress("LCL")
         self.passValue("M", "D")
         self.insertAddress(functionName)
+        self.fileToWrite.write("0;JMP\n")
         self.funcParenthesis(functionName)
         self.cur += 1
 
@@ -471,10 +472,13 @@ def listResAsmInDir(dir):
 def bootsrap(directoryName):
     listOfAsm = listResAsmInDir(sysInput)
     directoryOutput = (sysInput + directoryName + ".asm")
-    with open(directoryOutput, 'w') as fileToWrite:
-        for inFile in listOfAsm:
-            with open(inFile) as inputFile:
-                fileToWrite.write(inputFile.read())
+
+    # If the Asm file has been created we shall avoide override.
+    if directoryOutput not in listOfAsm:
+        with open(directoryOutput, 'w') as fileToWrite:
+            for inFile in listOfAsm:
+                with open(inFile) as inputFile:
+                    fileToWrite.write(inputFile.read())
 
 
 def main():
