@@ -4,7 +4,7 @@ import sys
 import os
 
 sysInput = sys.argv[1]
-initFlag = False
+initFlag = True
 
 class Parser:
     """
@@ -490,6 +490,8 @@ def main():
 
     isDir = os.path.isdir(sysInput)
     if isDir:
+        if not sysInput.endswith('/'):
+            sysInput = (sysInput + '/')
         listOfVm = listVmInDir(sysInput)
         for file in listOfVm:
             fileWithRelativePath = (sysInput + "/" + file)
