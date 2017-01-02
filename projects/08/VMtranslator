@@ -13,8 +13,11 @@ class Parser:
     def __init__(self, fileToParse):
         # open the file first only to initialze self.fileLength to the file length
         self.file = open(fileToParse, 'r')
-        self.file.readlines()
+        self.AllTheLines = self.file.readlines()
+        self.NumberOfLines = len(self.AllTheLines)
         self.fileLength = self.file.tell()
+        self.lineNumber = 0
+        self.currentLine = ""
         self.file.close()
         # Now open the file again for parsing, and initialize self.pos to 0
         self.file = open(fileToParse, "r")
@@ -39,6 +42,10 @@ class Parser:
         """
         return self.file.tell() < self.fileLength
 
+    # Again a modified function that should solve this.
+    def hasMoreCommands2(self):
+        return self.lineNumber < self.NumberOfLines
+
     def advance(self):
         line = self.file.readline()
         if len(line) == 0:
@@ -48,6 +55,23 @@ class Parser:
             self.advance()
         else:
             self.curCommand = lineWithoutComments.split(" ")
+
+    # Utility function for a different model of our parser.
+    def advance2(self):
+        if (self.lineNumber < self.NumberOfLines):
+            self.currentLine = self.AllTheLines[self.lineNumber]
+            self.lineNumber += 1
+            # print("current LineNumber:" + str(self.lineNumber) + '\n')
+            if (len(self.currentLine) == 0):
+                self.advance2()
+
+            # We use a static variable so in the end it should hold a real line.
+            lineWithoutComments = self.currentLine.split("/")[0].strip("\n")
+            self.currentLine = lineWithoutComments
+            if (len(self.currentLine) == 0):
+                self.advance2()
+            else:
+                self.curCommand = self.currentLine.split(" ")
 
     def commandType(self):
         command = self.curCommand[0]
@@ -297,10 +321,10 @@ class CodeWriter:
     #from here until writeCall, helper functions for writing assembly
     def declareFunc(self, functionName):
         self.writeComment("Declare func " + functionName)
-        self.fileToWrite.write("@retAdd" + functionName + str(self.cur) + "\n")
+        self.fileToWrite.write("@retAdd_" + functionName + "_"+ self.fileName +"." +str(self.cur) + "\n")
 
     def funcParenthesis(self, functionName):
-        self.fileToWrite.write("(retAdd" + functionName + str(self.cur) + ")\n")
+        self.fileToWrite.write("(retAdd_" + functionName + "_" +self.fileName + "."+str(self.cur) + ")\n")
 
     def functionMemorySegment(self, segment):
         self.fileToWrite.write("@" + segment + "\n")
@@ -325,7 +349,6 @@ class CodeWriter:
         self.functionMemorySegment("ARG")
         self.functionMemorySegment("THIS")
         self.functionMemorySegment("THAT")
-        # TODO : check required behaviour.
         self.insertAddress(str(numArgs))
         self.passValue("D", "A")
         self.insertAddress("SP")
@@ -423,8 +446,14 @@ def runOneFile(file):
     if initFlag:
         codeWrite.writeInit()
         initFlag = False
-    while (parser.hasMoreCommands()):
-        parser.advance()
+    while (parser.hasMoreCommands2()):
+        #TODO: remove testing variables. pre, aft, diff.
+        pre = parser.lineNumber
+        #changed to the new version.
+        parser.advance2()
+        aft = parser.lineNumber
+        diff = aft - pre
+        # print("Here is our lovely step from advance2: " + str(diff) + ',')
         commandType = parser.commandType()
         command = parser.curCommand[0]
         if commandType == "ca":
