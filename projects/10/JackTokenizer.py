@@ -86,7 +86,8 @@ class JackTokenizer:
                     quotOpen = False
             else:
                 if (quotOpen == True):
-                    stringWithSpaces += token + " "
+                    if (token.isAlpha()):
+                        stringWithSpaces += token + " "
                     continue
                 fixedTokens.append(token)
         return fixedTokens
