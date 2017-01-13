@@ -1,8 +1,4 @@
-#THIS FILE PASSED THE TESTS SUGGESTED FOR THE TOKENIZER BY THE COURSE USING DIFF ON THE OUR XML VS THE SUPPLIED XML
-#THERE ARE SOME METHODS NOT IMPLEMENTED SINCE I BELIEVE ARE MORE RELEVANT FOR PROJECT 11, WE STILL NEED TO THINK ABOUT THEM.
-#THIS FILE WAS NOT EASY TO MAKE!
-
-from JackLanguage import *
+# from JackLanguage import *
 import os
 import sys
 import re
@@ -49,6 +45,7 @@ class JackTokenizer:
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
+
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
             return None
@@ -164,13 +161,27 @@ def writeToXML(file, type, token):
     file.write ("<" + type + "> " + token + " <" + "/" + type + ">\n")
 
 def getXmlFromJack(jackFile):
-    filename = jackFile[:-5] + "T.xml"
+    #Changed the name to T2 so we don't get some override issues.
+    filename = jackFile[:-5] + "T2.xml"
     xml = open(filename, 'w')
     xml.write("<tokens>\n")
     return xml
 
+def PassingTokenArray(jackFile):
+    resArray = []
+    tokenizer = JackTokenizer(jackFile)
+    while (tokenizer.hasMoreTokens()):
+        tokenizer.advance()
+        data = tokenizer.token
+        type = tokenizer.getTypeOfToken()
+        tup = (type, data)
+        resArray.append(tup)
+    return resArray
+
+#This function writes to the XML file
+#Evtually shall be commented out, we only need an array of token objects.
+
 def main():
-    #This function writes to the XML file
     tokenizer = JackTokenizer(sys.argv[1])
     xml = getXmlFromJack(sys.argv[1])
     while (tokenizer.hasMoreTokens()):
@@ -179,4 +190,4 @@ def main():
         type = tokenizer.getTypeOfToken()
         writeToXML(xml, type, token)
     xml.write("</tokens>")
-main()
+# main()
