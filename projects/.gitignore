@@ -14,8 +14,16 @@
 *.tst
 */*.tst
 
+#Ignoring the asm files
+*/*.asm
+08/*/*/*.asm
+#Ignoring the vm files.
+*/*.vm
+08/*/*/*.vm
+
 #Igonring the special simulator folder
 sim
 
 #Random files that should be ignored
 ../tools/bin/Hardware Simulator.dat
+../tools/CPUEmulator.sh
