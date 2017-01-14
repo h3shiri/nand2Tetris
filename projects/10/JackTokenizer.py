@@ -42,6 +42,7 @@ class JackTokenizer:
         self.file = open(infile)
         self.token = ""
         self.tokens = self.parseFile()
+
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
@@ -49,6 +50,9 @@ class JackTokenizer:
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
             return None
+        if line[0] == "*":
+            return None
+
         else:
             return line.split("//", 1)[0].strip(' \t\n\r')
 
@@ -59,7 +63,7 @@ class JackTokenizer:
         if (symbol.isalpha()):
             return stripped
         stripped = stripped[:-2]
-        stripped +=symbol
+        stripped +=symbol + " "
         return stripped
 
 
@@ -69,26 +73,43 @@ class JackTokenizer:
         isString = False
         stringWithSpaces = ""
         for token in tokens:
+            if token == '"' or token == '”':
+                if quotOpen == False:
+                    quotOpen = True
+                    continue
+            if quotOpen == True:
+                if token == '"' or token == '”':
+                    quotOpen = False
+                    fixedTokens.append(self.fixString(stringWithSpaces))
+                    stringWithSpaces = ""
+                    continue
+                stringWithSpaces += " " + token
+                continue
             if token == "<":
                 fixedTokens.append("&lt;")
             elif token == ">":
                 fixedTokens.append("&gt;")
             elif token == "&":
                 fixedTokens.append("&amp;")
+                '''
             elif token == '"' or token == '”' :
                 if(quotOpen == False):
                     quotOpen = True
-                    #fixedTokens.append("&quot")
                     continue
                 elif(quotOpen == True):
                     fixedTokens.append(self.fixString(stringWithSpaces))
                     stringWithSpaces = ""
                     quotOpen = False
+                    '''
+
             else:
+                '''
                 if (quotOpen == True):
                     if (token.isalpha()):
                         stringWithSpaces += token + " "
+                        print(stringWithSpaces)
                     continue
+                '''
                 fixedTokens.append(token)
         return fixedTokens
 
@@ -105,6 +126,7 @@ class JackTokenizer:
             tokens += [token for token in re.split(r"(\W)", cleanLine) if token.strip()]
 
         tokens = [x.strip(' ') for x in tokens]
+
         return self.fixTokens(list(filter(bool, tokens)))
 
     def hasMoreTokens(self):
@@ -191,4 +213,7 @@ def main():
         type = tokenizer.getTypeOfToken()
         writeToXML(xml, type, token)
     xml.write("</tokens>")
-# main()
+
+'''
+main()
+'''
