@@ -29,11 +29,12 @@ class JackParser:
         #the next routine called must be compileClass() which in inside initProcess.
 
     # terminal_types = ["stringConstant", "keyword", "symbol", "integerConstant", "identifier"]
-    #TODO: check how call func with other func as parameter within the same obj, similar to eval in JS
+    # Wrapping function for non-terminal type.
     def wrappingNonTerminalFunc(self, nonTerminalName, internalFunc):
         self.writeOpenClause(nonTerminalName)
         self.indentaionMark += 1
-        #eval(self.internalFunc())
+        tFunc = getattr(self, internalFunc)
+        tFunc()
         self.indentaionMark -= 1
         self.writeClosingClause(nonTerminalName)
 
@@ -99,11 +100,9 @@ class JackParser:
         self.writeOpenClause("subroutineDec")
         self.indentaionMark += 1
         # writing the fixed strings down such as 'constructor', type, name, '('
-        self.writingFewSimpleToken(4)
+        self.writingFewSimpleTokens(4)
         # writing additional optional param list
-        self.indentaionMark += 1
         self.compileParametersList()
-        self.indentaionMark -= 1
         #the closing brackets ')'
         self.writingSimpleToken()
         # entering the subroutine body.
@@ -147,10 +146,10 @@ class JackParser:
         # begin by writing first mendatory first variable type and name.
         self.writingFewSimpleTokens(2)
         #we are going to iterate until we reach a semicolon.
-        nextTokenType, nextToken = self.rawTokens[0]
+        nextTokenType, nextToken = self.rawTokens.pop(0)
         while (nextToken != ';'):
-            nextTokenType, nextToken = self.rawTokens.pop(0)
             self.writeWithIndentation(nextTokenType, nextToken)
+            nextTokenType, nextToken = self.rawTokens.pop(0)
         # inserting the semicolon
         self.writeWithIndentation(nextTokenType, nextToken)
 
@@ -167,6 +166,8 @@ class JackParser:
         
     #Compiles a sequence of statements, not including the enclosing "{}"
     def compileStatements(self):
+        self.writeOpenClause("statements")
+        self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
         SOS = {"let", "if", "while", "do", "return"} # "abbreviation  StatementOpennerSet"
         while nextToken in SOS:
@@ -184,6 +185,9 @@ class JackParser:
                 #TODO: crazy error.
                 pass
 
+        self.writeClosingClause("statements")
+        self.indentaionMark -= 1
+
     #compiles a do statement
     def compileDo(self):
         self.scopeType = "doStatemnt"
@@ -199,7 +203,7 @@ class JackParser:
         self.writeClosingClause("doStatement")
 
     def compileSubroutineCall(self):
-        nextTokenType, nexToken = self.rawTokens[0]
+        nextTokenType, nextToken = self.rawTokens[0]
         followerType, followerToken = self.rawTokens[1]
         if followerToken == '(':
             # case one subroutine name and calling expList.
@@ -218,13 +222,13 @@ class JackParser:
 
     #compiles a let statement
     def compileLet(self):
-        self.scopeType = "letStatemnt"
+        self.scopeType = "letStatement"
         self.writeOpenClause("letStatement")
         self.indentaionMark += 1
         # unloading the "let", and varName
         self.writingFewSimpleTokens(2)
         nextTokenType, nextToken = self.rawTokens[0]
-        if (nexToken == '['): # " '[' exp ']' "
+        if (nextToken == '['): # " '[' exp ']' "
             self.scopeType = "arrayInLetStatement"
             self.writingSimpleToken()
             self.compileExpression()
@@ -259,8 +263,8 @@ class JackParser:
         # unloading the 'return' str
         self.writingSimpleToken()
         # probing for an expression.
-        nextTokenType, nexToken = self.rawTokens[0]
-        if nexToken != ';':
+        nextTokenType, nextToken = self.rawTokens[0]
+        if nextToken != ';':
             self.compileExpression()
         self.writingSimpleToken() # "reaching for the semicolon"
         self.indentaionMark -= 1
@@ -289,11 +293,8 @@ class JackParser:
         nextTokenType, nextToken = self.rawTokens[0]
         while (nextToken not in {')', ',', ']', ';'}):
             self.scopeType = "insideAnExp"
-            self.writeOpenClause("expression")
-            self.indentaionMark += 1
-            self.compileTerm()
-            self.indentaionMark -= 1
-            self.writeClosingClause("expression") 
+            self.wrappingNonTerminalFunc("expression", "compileTerm")
+            nextTokenType, nextToken = self.rawTokens[0]
             
 
     #See supplied API for more details
@@ -305,11 +306,8 @@ class JackParser:
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
-            self.writeOpenClause("term")
-            self.indentaionMark += 1
-            self.writingSimpleToken()
-            self.indentaionMark -= 1
-            self.writeClosingClause("term")
+            self.wrappingNonTerminalFunc("term", "writingSimpleToken")
+            
         #documented in the API   
         elif nextTokenType == "identifier":
             self.writeOpenClause("term")
@@ -337,18 +335,26 @@ class JackParser:
 
         # Another expression inside
         elif nextToken == '(':
+            self.writeOpenClause("term")
+            self.indentaionMark += 1
             self.writingSimpleToken() # "moving the openner '(' "
             self.compileExpression()
             self.writingSimpleToken() # "closing the exp with ')' "
+            self.indentaionMark -= 1
+            self.writeClosingClause("term") # closing the term
         #unaryOp case
         elif nextToken in { '-', '~'}:
+            self.writeOpenClause("term")
+            self.indentaionMark += 1
             self.writingSimpleToken()
-            self.compileTerm()          
+            self.compileTerm()
+            self.indentaionMark -= 1
+            self.writeClosingClause("term") # closing the term      
         else:
             pass
             #TODO: error we should have atleast one term.
         nextTokenType , nextToken = self.rawTokens[0]
-        if nexToken in opSet:
+        if nextToken in opSet:
             self.writingSimpleToken()
             self.compiletTerm()
 
