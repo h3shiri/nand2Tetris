@@ -139,7 +139,7 @@ class JackParser:
         self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
         while(nextToken != ')'):
-            nextTokenType, nextToken = self.pop(0)
+            nextTokenType, nextToken = self.rawTokens.pop(0)
             self.writeWithIndentation(nextTokenType, nextToken)
         self.indentaionMark -= 1
         self.writeClosingClause("parameterList")
