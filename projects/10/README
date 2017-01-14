@@ -1,0 +1,20 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 10 - Building the compiler, assembling tree stage from tokens.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+JackAnalyzer - driver to our compiler from jack, to appropriate token trees.
+JackParser.py - assembling all the rokens according to the CFG of Jack.
+JackTokenizer.py - Breaking down file input into the relevant tokens.
+Makefile - making our script executable.
+
+Remarks
+-------
+This is wicked, watch out not to burn your eyes.

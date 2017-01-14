@@ -422,3 +422,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def parseOneFile(fileName):
+    listOfTokens = PassingTokenArray(fileName)
+    outFile = fileName[:-5] + ".xml"
+    parser = JackParser(listOfTokens, outFile)
+    parser.initProcess()
+    
