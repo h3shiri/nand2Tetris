@@ -4,4 +4,5 @@
 
 #untrack the backup files
 BackUpFiles/*
-__pychache/*
+__pycache__/*
+test.py
