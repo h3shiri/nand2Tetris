@@ -14,7 +14,7 @@ keywords = [
         "void",
         "var",
         "static",
-        "filed",
+        "field",
         "let",
         "do",
         "if",
@@ -41,11 +41,13 @@ class JackTokenizer:
         #Opens the file and gets ready to tokenize
         self.file = open(infile)
         self.token = ""
+        self.p1_comments = re.compile(r"^\s*\/?\*")
         self.tokens = self.parseFile()
 
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
+        
 
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
@@ -53,6 +55,12 @@ class JackTokenizer:
         if line[0] == "*":
             return None
 
+        else:
+            return line.split("//", 1)[0].strip(' \t\n\r')
+
+    def removeCommentsFromLine2(self, line):
+        if self.p1_comments.search(line) != None:
+            return None
         else:
             return line.split("//", 1)[0].strip(' \t\n\r')
 
@@ -118,7 +126,7 @@ class JackTokenizer:
         cleanLines = []
         tokens = []
         for line in self.file.readlines():
-            cleanLine = self.removeCommentsFromLine(line)
+            cleanLine = self.removeCommentsFromLine2(line)
             if cleanLine != None:
                 cleanLines.append(cleanLine)
         for cleanLine in cleanLines:
@@ -214,6 +222,4 @@ def main():
         writeToXML(xml, type, token)
     xml.write("</tokens>")
 
-'''
-main()
-'''
+# main()

@@ -57,7 +57,6 @@ class JackParser:
         #In case we have more tokens we proceed, to the classVarDec or subroutineDec 
         while(self.hasAnyTokensLeft()):
             # TODO: remove debugging.
-            print(self.scopeType+'\n')
             type, token = self.rawTokens[0]
             # Variables declarations.
             if token in {"field", "static"}:
@@ -139,8 +138,8 @@ class JackParser:
         self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
         while(nextToken != ')'):
-            nextTokenType, nextToken = self.rawTokens.pop(0)
-            self.writeWithIndentation(nextTokenType, nextToken)
+            self.writingSimpleToken()
+            nextTokenType, nextToken = self.rawTokens[0]
         self.indentaionMark -= 1
         self.writeClosingClause("parameterList")
             
@@ -250,7 +249,7 @@ class JackParser:
     # compiling the while condition
     def compileWhile(self):
         self.scopeType = "whileStatement"
-        self.writeClosingClause("whileStatement")
+        self.writeOpenClause("whileStatement")
         self.indentaionMark += 1
         # unload the "while" and '('
         self.writingFewSimpleTokens(2)
@@ -296,7 +295,7 @@ class JackParser:
         self.indentaionMark -= 1
         self.writeClosingClause("ifStatement")
 
-    # compiling an expression we have atleast one term.
+    # compiling an expression we have atleast one term, not including out most encapsulating ().
     def compileExpression(self):
         nextTokenType, nextToken = self.rawTokens[0]
         while (nextToken not in {')', ',', ']', ';'}):
@@ -310,7 +309,7 @@ class JackParser:
     # We also compile additional terms and operands in between.
     def compileTerm(self):
         self.scopeType = "probing For terminals"
-        opSet = {'+', '-', '*', '/', "&lt", "&gt", "&amp", '|', '='}
+        opSet = {'+', '-', '*', '/', "&lt;", "&gt;", "&amp;", '|', '='}
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
@@ -378,7 +377,7 @@ class JackParser:
         while(nextToken != ')'): # "breaking value adjacent to ';' "
             self.compileExpression()
             nextTokenType, nextToken = self.rawTokens[0]
-            if nextTokenType == "," :
+            if nextToken == ",":
                 self.writingSimpleToken() # "getting to the next exp, removing the , "
 
         self.indentaionMark -= 1
