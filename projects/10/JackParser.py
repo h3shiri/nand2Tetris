@@ -73,9 +73,9 @@ class JackParser:
                 self.scopeType = "StatementsAtClassOuterScope"
                 self.compileStatements()
 
-            # EmptyClass
+            # EmptyClass or closing the class.
             elif token == '}':
-                self.writeWithIndentation(type, token)
+                self.writingSimpleToken()
             else:
                 #TODO: appropriate error, for non valid syntax.
                 pass
@@ -134,11 +134,15 @@ class JackParser:
 
     #compiles a parameters list, not including the enclosing "()"
     def compileParametersList(self):
-        self.scopeType = "paramList"
+        self.scopeType = "parameterList"
+        self.writeOpenClause("parameterList")
+        self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
         while(nextToken != ')'):
             nextTokenType, nextToken = self.pop(0)
             self.writeWithIndentation(nextTokenType, nextToken)
+        self.indentaionMark -= 1
+        self.writeClosingClause("parameterList")
             
     # Compiling a sequence of variables including the ';'       
     def compileVariables(self):
@@ -184,9 +188,11 @@ class JackParser:
             else:
                 #TODO: crazy error.
                 pass
+            # Updating for next iteration.
+            nextTokenType, nextToken = self.rawTokens[0]
 
-        self.writeClosingClause("statements")
         self.indentaionMark -= 1
+        self.writeClosingClause("statements")
 
     #compiles a do statement
     def compileDo(self):
@@ -197,7 +203,7 @@ class JackParser:
         self.writingSimpleToken()
         # compiling the subroutine.
         self.compileSubroutineCall()
-        self.writingFewSimpleToken() # "catching the semicolon from the do statement"
+        self.writingSimpleToken() # "catching the semicolon from the do statement"
         # Closing the expression list
         self.indentaionMark -= 1
         self.writeClosingClause("doStatement")
@@ -273,6 +279,8 @@ class JackParser:
     # compiling the if statement and including the possibility for else.
     def compileIf(self):
         self.scopeType = "ifStatement"
+        self.writeOpenClause("ifStatement")
+        self.indentaionMark += 1
         self.writingFewSimpleTokens(2) # "if and '('"
         self.compileExpression()
         self.writingFewSimpleTokens(2) # "closing ')' and opening '{'"
@@ -356,7 +364,7 @@ class JackParser:
         nextTokenType , nextToken = self.rawTokens[0]
         if nextToken in opSet:
             self.writingSimpleToken()
-            self.compiletTerm()
+            self.compileTerm()
 
         # self reference should be indurable here due to stack poping, checking for op.
                
