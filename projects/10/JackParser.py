@@ -1,18 +1,19 @@
 from JackTokenizer import *
-
+"""
 #Symbols
 symbols = [
         "{","}", "(", ")", "[", "]", ".", ",", ";", "+", "-", "*", "/", "&", "|", "<", ">", "=", "~",
         "&lt;", "&gt;", "&amp;", "&quot"
     ]
-
+"""
 # All the various scope options aka non-terminals.
+"""
 ScopeTypes = [
     "class", "classVarDec", "subroutineDec", "parameterList", "subroutineBody", "VarDec",
     "statements", "whileStatement", "ifStatement", "returnStatement", "letStatement", "doStatement"
     "expression", "term", "expressionList"    
     ]
-
+"""
 class JackParser:
 
     #Creates a new compliation engine with the given input and output
@@ -25,23 +26,17 @@ class JackParser:
         self.delim = "  "
         # Refering to the relational scope location
         self.scopeType = ""
-
-
         #the next routine called must be compileClass() which in inside initProcess.
 
     # terminal_types = ["stringConstant", "keyword", "symbol", "integerConstant", "identifier"]
-    #A utility function which I'm not using, there was a recursive notion here.
-    def parseNextToken(self, type, token):
-        basicTypes = {"stringConstant", "integerConstant", "identifier", "symbol", "keyword"}
-        if type in basicTypes:
-            self.writeWithIndentation(type, token)
-        elif type == "symbol":
-            pass
-        elif type == "keyword":
-            pass
-        else:
-            #TODO: print a colorful error here.
-            pass
+    #TODO: check how call func with other func as parameter within the same obj, similar to eval in JS
+    def wrappingNonTerminalFunc(self, nonTerminalName, internalFunc):
+        self.writeOpenClause(nonTerminalName)
+        self.indentaionMark += 1
+        #eval(self.internalFunc())
+        self.indentaionMark -= 1
+        self.writeClosingClause(nonTerminalName)
+
 
     # Utility function for processing the next tokens simply as they are into the xml file.
     def writingSimpleToken(self):
@@ -123,7 +118,7 @@ class JackParser:
         self.scopeType = "subroutineBody"
         self.writeOpenClause("subroutineBody")
         self.indentaionMark += 1
-        self.writingSimpleToken() // '{'
+        self.writingSimpleToken() # '{'
         # covering all the variables declarations.
         nextTokenType, nextToken = self.rawTokens[0]
         while (nextToken == "var"):
@@ -133,7 +128,7 @@ class JackParser:
         # compiling the various statements
         self.compileStatements()
 
-        self.writingSimpleToken() // '}'
+        self.writingSimpleToken() # '}'
         #closing tag
         self.indentaionMark -= 1
         self.writeClosingClause("subroutineBody")
@@ -170,44 +165,217 @@ class JackParser:
         self.indentaionMark -= 1
         self.writeClosingClause("varDec")
         
-
+    #Compiles a sequence of statements, not including the enclosing "{}"
     def compileStatements(self):
-        #Compiles a sequence of statements, not including the enclosing "{}"
-        pass
+        nextTokenType, nextToken = self.rawTokens[0]
+        SOS = {"let", "if", "while", "do", "return"} # "abbreviation  StatementOpennerSet"
+        while nextToken in SOS:
+            if nextToken == "let":
+                self.compileLet()
+            elif nextToken == "if":
+                self.compileIf()
+            elif nextToken == "do":
+                self.compileDo()
+            elif nextToken == "return":
+                self.compileReturn()
+            elif nextToken == "while":
+                self.compileWhile()
+            else:
+                #TODO: crazy error.
+                pass
 
+    #compiles a do statement
     def compileDo(self):
-        #compiles a do statement
-        pass
+        self.scopeType = "doStatemnt"
+        self.writeOpenClause("doStatement")
+        self.indentaionMark += 1
+        # Unloading the 'do', subroutineName.
+        self.writingSimpleToken()
+        # compiling the subroutine.
+        self.compileSubroutineCall()
+        self.writingFewSimpleToken() # "catching the semicolon from the do statement"
+        # Closing the expression list
+        self.indentaionMark -= 1
+        self.writeClosingClause("doStatement")
 
+    def compileSubroutineCall(self):
+        nextTokenType, nexToken = self.rawTokens[0]
+        followerType, followerToken = self.rawTokens[1]
+        if followerToken == '(':
+            # case one subroutine name and calling expList.
+            self.scopeType = "subroutineLocalMethodCall"
+            self.writingFewSimpleTokens(2)
+        elif followerToken == '.':
+            self.scopeType = "foreignFunctionCall"
+            # calling foreign method aka nameV + '.' + nameM + '('
+            self.writingFewSimpleTokens(4)
+        else:
+            #TODO: non-valid function call ERROR
+            pass
+
+        self.compileExpressionList()
+        self.writingSimpleToken() # "closing bracket for the expL ')"
+
+    #compiles a let statement
     def compileLet(self):
-        #compiles a let statement
-        pass
+        self.scopeType = "letStatemnt"
+        self.writeOpenClause("letStatement")
+        self.indentaionMark += 1
+        # unloading the "let", and varName
+        self.writingFewSimpleTokens(2)
+        nextTokenType, nextToken = self.rawTokens[0]
+        if (nexToken == '['): # " '[' exp ']' "
+            self.scopeType = "arrayInLetStatement"
+            self.writingSimpleToken()
+            self.compileExpression()
+            self.writingSimpleToken()
 
+        # getting into the subsitution part
+        self.writingSimpleToken() # "the equality"
+        self.compileExpression()
+        self.writingSimpleToken() # "getting the semicolon"
+        self.indentaionMark -= 1
+        self.writeClosingClause("letStatement")
+
+    # compiling the while condition
     def compileWhile(self):
-        pass
+        self.scopeType = "whileStatement"
+        self.writeClosingClause("whileStatement")
+        self.indentaionMark += 1
+        # unload the "while" and '('
+        self.writingFewSimpleTokens(2)
+        self.compileExpression()
+        self.writingFewSimpleTokens(2) # "closing ')' and openning '{' "
+        self.compileStatements()
+        self.writingSimpleToken() # "closing '}' "
+        self.indentaionMark -= 1
+        self.writeClosingClause("whileStatement")
 
+    # compiling a return statement
     def compileReturn(self):
-        pass
+        self.scopeType = "returnScope"
+        self.writeOpenClause("returnStatement")
+        self.indentaionMark += 1
+        # unloading the 'return' str
+        self.writingSimpleToken()
+        # probing for an expression.
+        nextTokenType, nexToken = self.rawTokens[0]
+        if nexToken != ';':
+            self.compileExpression()
+        self.writingSimpleToken() # "reaching for the semicolon"
+        self.indentaionMark -= 1
+        self.writeClosingClause("returnStatement")
 
+    # compiling the if statement and including the possibility for else.
     def compileIf(self):
-        pass
+        self.scopeType = "ifStatement"
+        self.writingFewSimpleTokens(2) # "if and '('"
+        self.compileExpression()
+        self.writingFewSimpleTokens(2) # "closing ')' and opening '{'"
+        self.compileStatements()
+        self.writingSimpleToken() # " closing '}' "
+        # probing for an "else" token
+        nextTokenType, nextToken = self.rawTokens[0]
+        if nextToken == "else":
+            self.writingFewSimpleTokens(2)
+            self.compileStatements()
+            self.writingSimpleToken()
 
+        self.indentaionMark -= 1
+        self.writeClosingClause("ifStatement")
+
+    # compiling an expression we have atleast one term.
     def compileExpression(self):
-        pass
+        nextTokenType, nextToken = self.rawTokens[0]
+        while (nextToken not in {')', ',', ']', ';'}):
+            self.scopeType = "insideAnExp"
+            self.writeOpenClause("expression")
+            self.indentaionMark += 1
+            self.compileTerm()
+            self.indentaionMark -= 1
+            self.writeClosingClause("expression") 
+            
 
     #See supplied API for more details
+    # differentiating between various scenarios (3) using a look ahead token.
+    # We also compile additional terms and operands in between.
     def compileTerm(self):
-        pass
+        self.scopeType = "probing For terminals"
+        opSet = {'+', '-', '*', '/', "&lt", "&gt", "&amp", '|', '='}
+        nextTokenType, nextToken = self.rawTokens[0]
+        followTokenType, followToken = self.rawTokens[1]
+        if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
+            self.writeOpenClause("term")
+            self.indentaionMark += 1
+            self.writingSimpleToken()
+            self.indentaionMark -= 1
+            self.writeClosingClause("term")
+        #documented in the API   
+        elif nextTokenType == "identifier":
+            self.writeOpenClause("term")
+            self.indentaionMark += 1
+            symbols1 = [
+            "{","}", "(", ")", "[", "]", ".", ",", ";", "+", "-", "*", "/", "&", "|", "<", ">", "=", "~",
+            "&lt;", "&gt;", "&amp;", "&quot"]
+            if followToken == '[':
+                self.scopeType = "arrayProbing"
+                self.writingFewSimpleTokens(2) # "nameArr , '[' "
+                self.compileExpression()
+                self.writingSimpleToken() # "]"
+            elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
+                self.scopeType = "callToFunctionFromTerm"
+                self.compileSubroutineCall()
+            # "weak condition, meant just to have a vague feeling"
+            elif (followToken in symbols1):
+                self.writingSimpleToken()
 
-    #compiled a (possibly empty) comma seperated list of expressions
+            else:
+                #TODO: print ERROR here for non valid format.
+                pass
+            self.indentaionMark -= 1
+            self.writeClosingClause("term")
+
+        # Another expression inside
+        elif nextToken == '(':
+            self.writingSimpleToken() # "moving the openner '(' "
+            self.compileExpression()
+            self.writingSimpleToken() # "closing the exp with ')' "
+        #unaryOp case
+        elif nextToken in { '-', '~'}:
+            self.writingSimpleToken()
+            self.compileTerm()          
+        else:
+            pass
+            #TODO: error we should have atleast one term.
+        nextTokenType , nextToken = self.rawTokens[0]
+        if nexToken in opSet:
+            self.writingSimpleToken()
+            self.compiletTerm()
+
+        # self reference should be indurable here due to stack poping, checking for op.
+               
+
+
+    # compiles a (possibly empty) comma seperated list of expressions, not including the ()
     def compileExpressionList(self):
-        pass
+        self.writeOpenClause("expressionList")
+        self.indentaionMark += 1
+        nextTokenType, nextToken = self.rawTokens[0]
+        while(nextToken != ')'): # "breaking value adjacent to ';' "
+            self.compileExpression()
+            nextTokenType, nextToken = self.rawTokens[0]
+            if nextTokenType == "," :
+                self.writingSimpleToken() # "getting to the next exp, removing the , "
+
+        self.indentaionMark -= 1
+        self.writeClosingClause("expressionList")
 
     # Small function for initiating the project.
     def initProcess(self):
         self.outFile.write("<class>\n")
         self.indentaionMark += 1
         self.compileClass()
+        self.indentaionMark -= 1
         self.outFile.write("</class>")
 
     # Writing into the output file with proper indentation the relevant terminal token.
@@ -239,4 +407,5 @@ def main():
     parser = JackParser(listOfTokens, outFile)
     parser.initProcess()
 
-main()
+if __name__ == "__main__":
+    main()
