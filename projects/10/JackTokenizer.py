@@ -35,7 +35,7 @@ symbols = [
 class JackTokenizer:
 
     TOKEN_TYPES = ["KEYWORD", "SYMBOL", "IDENTIFIER", "INT_CONST", "STRING_CONST"]
-
+    multi = False
 
     def __init__(self, infile):
         #Opens the file and gets ready to tokenize
@@ -43,11 +43,10 @@ class JackTokenizer:
         self.token = ""
         self.p1_comments = re.compile(r"^\s*\/?\*")
         self.tokens = self.parseFile()
-
+        self.multi = False
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
-        
 
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
@@ -59,8 +58,19 @@ class JackTokenizer:
             return line.split("//", 1)[0].strip(' \t\n\r')
 
     def removeCommentsFromLine2(self, line):
+        if "/*" in line:
+            self.multi = True
+        if self.multi and "*/" in line:
+            line = line.split("*/", 1)[1]
+            self.multi = False
+            return self.removeCommentsFromLine2(line)
+        if self.multi:
+            return None
         if self.p1_comments.search(line) != None:
             return None
+        if line.strip().endswith("*/"):
+            line = line.split("*", 1)[0].strip(' \t\n\r')
+            return line
         else:
             return line.split("//", 1)[0].strip(' \t\n\r')
 
@@ -68,7 +78,7 @@ class JackTokenizer:
         global symbols
         stripped = toFix.strip()
         symbol = stripped[-1:]
-        if (symbol.isalpha()):
+        if (symbol.isalpha() or symbol.isdigit()):
             return stripped
         stripped = stripped[:-2]
         stripped +=symbol + " "
@@ -78,9 +88,9 @@ class JackTokenizer:
     def fixTokens(self,tokens):
         fixedTokens = []
         quotOpen = False
-        isString = False
         stringWithSpaces = ""
         for token in tokens:
+
             if token == '"' or token == '”':
                 if quotOpen == False:
                     quotOpen = True
@@ -99,25 +109,7 @@ class JackTokenizer:
                 fixedTokens.append("&gt;")
             elif token == "&":
                 fixedTokens.append("&amp;")
-                '''
-            elif token == '"' or token == '”' :
-                if(quotOpen == False):
-                    quotOpen = True
-                    continue
-                elif(quotOpen == True):
-                    fixedTokens.append(self.fixString(stringWithSpaces))
-                    stringWithSpaces = ""
-                    quotOpen = False
-                    '''
-
             else:
-                '''
-                if (quotOpen == True):
-                    if (token.isalpha()):
-                        stringWithSpaces += token + " "
-                        print(stringWithSpaces)
-                    continue
-                '''
                 fixedTokens.append(token)
         return fixedTokens
 
