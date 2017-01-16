@@ -1,4 +1,5 @@
 from JackTokenizer import *
+#TODO: EX11 - upgarde the xml to include new vals for the proper tree building process. 
 """
 #Symbols
 symbols = [

@@ -1,0 +1,8 @@
+#Ignoring variosu sub directories
+*/*
+
+# No need to track submission or backups
+*.tar
+VMtranstor_backup
+test8.sh
+../../tools/hs_err_pid9468.log

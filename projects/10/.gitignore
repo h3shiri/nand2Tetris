@@ -1,0 +1,9 @@
+#Not necessary to track all these xml's
+*.xml
+*/*.xml
+
+#untrack the backup files
+BackUpFiles/*
+__pycache__/*
+test.py
+project10.tar

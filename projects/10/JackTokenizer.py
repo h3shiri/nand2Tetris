@@ -1,8 +1,4 @@
-#THIS FILE PASSED THE TESTS SUGGESTED FOR THE TOKENIZER BY THE COURSE USING DIFF ON THE OUR XML VS THE SUPPLIED XML
-#THERE ARE SOME METHODS NOT IMPLEMENTED SINCE I BELIEVE ARE MORE RELEVANT FOR PROJECT 11, WE STILL NEED TO THINK ABOUT THEM.
-#THIS FILE WAS NOT EASY TO MAKE!
-
-from JackLanguage import *
+# from JackLanguage import *
 import os
 import sys
 import re
@@ -18,7 +14,7 @@ keywords = [
         "void",
         "var",
         "static",
-        "filed",
+        "field",
         "let",
         "do",
         "if",
@@ -39,19 +35,42 @@ symbols = [
 class JackTokenizer:
 
     TOKEN_TYPES = ["KEYWORD", "SYMBOL", "IDENTIFIER", "INT_CONST", "STRING_CONST"]
-
+    multi = False
 
     def __init__(self, infile):
         #Opens the file and gets ready to tokenize
         self.file = open(infile)
         self.token = ""
+        self.p1_comments = re.compile(r"^\s*\/?\*")
         self.tokens = self.parseFile()
+        self.multi = False
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
+
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
             return None
+        if line[0] == "*":
+            return None
+
+        else:
+            return line.split("//", 1)[0].strip(' \t\n\r')
+
+    def removeCommentsFromLine2(self, line):
+        if "/*" in line:
+            self.multi = True
+        if self.multi and "*/" in line:
+            line = line.split("*/", 1)[1]
+            self.multi = False
+            return self.removeCommentsFromLine2(line)
+        if self.multi:
+            return None
+        if self.p1_comments.search(line) != None:
+            return None
+        if line.strip().endswith("*/"):
+            line = line.split("*", 1)[0].strip(' \t\n\r')
+            return line
         else:
             return line.split("//", 1)[0].strip(' \t\n\r')
 
@@ -59,38 +78,38 @@ class JackTokenizer:
         global symbols
         stripped = toFix.strip()
         symbol = stripped[-1:]
-        if (symbol.isalpha()):
+        if (symbol.isalpha() or symbol.isdigit()):
             return stripped
         stripped = stripped[:-2]
-        stripped +=symbol
+        stripped +=symbol + " "
         return stripped
 
 
     def fixTokens(self,tokens):
         fixedTokens = []
         quotOpen = False
-        isString = False
         stringWithSpaces = ""
         for token in tokens:
+
+            if token == '"' or token == '”':
+                if quotOpen == False:
+                    quotOpen = True
+                    continue
+            if quotOpen == True:
+                if token == '"' or token == '”':
+                    quotOpen = False
+                    fixedTokens.append(self.fixString(stringWithSpaces))
+                    stringWithSpaces = ""
+                    continue
+                stringWithSpaces += " " + token
+                continue
             if token == "<":
                 fixedTokens.append("&lt;")
             elif token == ">":
                 fixedTokens.append("&gt;")
             elif token == "&":
                 fixedTokens.append("&amp;")
-            elif token == '"' or token == '”' :
-                if(quotOpen == False):
-                    quotOpen = True
-                    #fixedTokens.append("&quot")
-                    continue
-                elif(quotOpen == True):
-                    fixedTokens.append(self.fixString(stringWithSpaces))
-                    stringWithSpaces = ""
-                    quotOpen = False
             else:
-                if (quotOpen == True):
-                    stringWithSpaces += token + " "
-                    continue
                 fixedTokens.append(token)
         return fixedTokens
 
@@ -99,7 +118,7 @@ class JackTokenizer:
         cleanLines = []
         tokens = []
         for line in self.file.readlines():
-            cleanLine = self.removeCommentsFromLine(line)
+            cleanLine = self.removeCommentsFromLine2(line)
             if cleanLine != None:
                 cleanLines.append(cleanLine)
         for cleanLine in cleanLines:
@@ -107,6 +126,7 @@ class JackTokenizer:
             tokens += [token for token in re.split(r"(\W)", cleanLine) if token.strip()]
 
         tokens = [x.strip(' ') for x in tokens]
+
         return self.fixTokens(list(filter(bool, tokens)))
 
     def hasMoreTokens(self):
@@ -164,13 +184,27 @@ def writeToXML(file, type, token):
     file.write ("<" + type + "> " + token + " <" + "/" + type + ">\n")
 
 def getXmlFromJack(jackFile):
-    filename = jackFile[:-5] + "T.xml"
+    #Changed the name to T2 so we don't get some override issues.
+    filename = jackFile[:-5] + "T2.xml"
     xml = open(filename, 'w')
     xml.write("<tokens>\n")
     return xml
 
+def PassingTokenArray(jackFile):
+    resArray = []
+    tokenizer = JackTokenizer(jackFile)
+    while (tokenizer.hasMoreTokens()):
+        tokenizer.advance()
+        data = tokenizer.token
+        type = tokenizer.getTypeOfToken()
+        tup = (type, data)
+        resArray.append(tup)
+    return resArray
+
+#This function writes to the XML file
+#Evtually shall be commented out, we only need an array of token objects.
+
 def main():
-    #This function writes to the XML file
     tokenizer = JackTokenizer(sys.argv[1])
     xml = getXmlFromJack(sys.argv[1])
     while (tokenizer.hasMoreTokens()):
@@ -179,4 +213,5 @@ def main():
         type = tokenizer.getTypeOfToken()
         writeToXML(xml, type, token)
     xml.write("</tokens>")
-main()
+
+# main()
