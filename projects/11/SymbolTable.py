@@ -121,17 +121,14 @@ class Tree:
 	def __init__(self, xmlFile):
 		self.tree = ET.parse(xmlFile)
 		self.root = tree.getroot() # actually a fancy dict, derived from the xml file.
-
+		# TODO : start parsing the xml properly.
 		self.classTableRoot = SymbolTable(None, "class") # Class Scope Node
 		self.subroutineScopes = [] # fill this up as you parse the file.
-
-
-	"""from here on is the book API suggestion for symbol table"""
-	#TODO: move most of the internal scope functions into the SymbolTable node.
 	
 
 	def startSubroutine(self):
-		pass
+		newSubroutineScope = SymbolTable(self.classTableRoot, "subroutine")
+		self.subroutineScopes.append(newSubroutineScope)
 
 	"""
 	@name: A new identifier representing the label name
