@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET
+#import xml.etree.ElementTree as ET
 #TODO: parse the xml tree in a neat and organize way.
 
 class SymbolTable:
@@ -119,9 +119,6 @@ class Tree:
 	root scope should be class element, and respective leaves should be subroutines scopes.
 	"""
 	def __init__(self, xmlFile):
-		self.tree = ET.parse(xmlFile)
-		self.root = tree.getroot() # actually a fancy dict, derived from the xml file.
-		# TODO : start parsing the xml properly.
 		self.classTableRoot = SymbolTable(None, "class") # Class Scope Node
 		self.subroutineScopes = [] # fill this up as you parse the file.
 	
