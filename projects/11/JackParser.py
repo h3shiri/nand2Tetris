@@ -438,7 +438,7 @@ if __name__ == "__main__":
 
 def parseOneFile(fileName):
     listOfTokens = PassingTokenArray(fileName)
-    outFile = fileName[:-5] + ".xml"
+    outFile = fileName[:-5] + ".vm"
     parser = JackParser(listOfTokens, outFile)
     parser.initProcess()
     
