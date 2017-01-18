@@ -15,6 +15,7 @@ class SymbolTable:
 		self.fatherScope = fatherScope
 		# Should be set on "class" or "subroutine".
 		self.scopeType = scopeType 
+		self.scopeName = ""
 		self.staticCounter = 0
 		self.fieldCounter = 0
 		self.argumentCounter = 0
@@ -24,7 +25,11 @@ class SymbolTable:
 		self.elements = dict()
 		# offset dictionary
 		self.offsets = {"static":0, "field":0, "argument":0, "var":0}
-		
+	
+	# Setting the scope name useful for class scope and perhaps subroutine.
+	def setName(self, nameOfScope):
+		self.scopeName = nameOfScope
+
 	# Addidng a label to the current scope.	 
 	def addLabel(self, kind, type, name):
 		classKinds = {"static", "field"}
@@ -111,14 +116,14 @@ class SymbolTable:
 
 #TODO: check the scope limitation is it actually just class and subroutine scopes (2)
 #which means no internal declarations this makes our ordeal significantly simpler??
-class Tree:
+class clssNode:
 	"""
 	This class represent our parsing tree.
 	Each Node is a symbol Table, and has internal methods for
 	fetching variables along the tree.
 	root scope should be class element, and respective leaves should be subroutines scopes.
 	"""
-	def __init__(self, xmlFile):
+	def __init__(self):
 		self.classTableRoot = SymbolTable(None, "class") # Class Scope Node
 		self.subroutineScopes = [] # fill this up as you parse the file.
 	

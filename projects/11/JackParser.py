@@ -29,9 +29,17 @@ ScopeTypes = [
 """
 class JackParser:
 
+    """
+    some guide lines to rewrite of the class
+    K(arg) - we keep this argument, should be used in the vm code somehow.
+    T(arg) - through this to the trash.
+    """
     #Creates a new compliation engine with the given input and output
-    def __init__(self, listOfTokens, outfileName):
-        self.outFile = open(outfileName, 'w')
+    def __init__(self, listOfTokens, VMWriter, classRoot):
+        # Handles all the output for the VM. 
+        self.writer = VMWriter
+        # Handles the scopes
+        self.classScope = classRoot
         self.rawTokens = listOfTokens
         # one and not zero due to initial wrappers of XML.
         self.indentaionMark = 0
@@ -51,12 +59,24 @@ class JackParser:
         self.indentaionMark -= 1
         self.writeClosingClause(nonTerminalName)
 
+    # returns the requested token as (type, token).
+    def popToken(self):
+        type, token = self.rawTokens.pop(0)
+        return (type, token)
 
+    # Simple function for throwing out the non useful tokens.
+    def throwToken(self):
+        trashType, trashTOken = self.rawTokens.pop(0)
+
+    # TODO: acually erase this statement from the code.
     # Utility function for processing the next tokens simply as they are into the xml file.
     def writingSimpleToken(self):
         type, token = self.rawTokens.pop(0)
-        self.writeWithIndentation(type, token)
-    # Extension for multi iteration.
+        # We don't need to write anymore to the xml.
+        # self.writeWithIndentation(type, token)
+
+    
+    # throwing several noncompiled elements to the trash basically.
     def writingFewSimpleTokens(self, iterations):
         for i in range(iterations):
             self.writingSimpleToken()
@@ -64,12 +84,15 @@ class JackParser:
     #compiles a complete class
     def compileClass(self):
         self.scopeType = "class"
-        # getting the 'class', name and '{'
-        self.writingFewSimpleTokens(3)
+        # getting the T('class'), K(name) and T('{')
+        self.throwToken()
+        type, token = self.popToken()
+        self.classScope.setName(token)
+        self.throwToken()
 
         #In case we have more tokens we proceed, to the classVarDec or subroutineDec 
         while(self.hasAnyTokensLeft()):
-            # TODO: remove debugging.
+            
             type, token = self.rawTokens[0]
             # Variables declarations.
             if token in {"field", "static"}:
@@ -87,10 +110,10 @@ class JackParser:
 
             # EmptyClass or closing the class.
             elif token == '}':
-                self.writingSimpleToken()
+                self.throwToken()
             else:
-                #TODO: appropriate error, for non valid syntax.
-                pass
+                print("Non Valid format: within clas scope")
+                return
 
 
     #Compiles a static or field declaration
@@ -314,6 +337,7 @@ class JackParser:
         while (nextToken not in {')', ',', ']', ';'}):
             self.scopeType = "insideAnExp"
             self.wrappingNonTerminalFunc("expression", "compileTerm")
+            self.compileTerm()
             nextTokenType, nextToken = self.rawTokens[0]
             
 
@@ -323,15 +347,17 @@ class JackParser:
     def compileTerm(self):
         self.scopeType = "probing For terminals"
         opSet = {'+', '-', '*', '/', "&lt;", "&gt;", "&amp;", '|', '='}
+        opDic = {'+': "add", '-':"sub", '*': "Math.multiply", '/':"Math.divide", "&lt;": "lt", "&gt;": "gt",
+                "&amp;": "and", '|': "or", '=': "eq", '-':"neg", '~':"not"}
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
+        # In such a case we should simply push the argument.
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
-            self.wrappingNonTerminalFunc("term", "writingSimpleToken")
+            #TODO: handle constants correctly
+            self.wrappingNonTerminalFunc("term", "writingSimpleToken") # we simply compile this term
             
         #documented in the API   
         elif nextTokenType == "identifier":
-            self.writeOpenClause("term")
-            self.indentaionMark += 1
             symbols1 = [
             "{","}", "(", ")", "[", "]", ".", ",", ";", "+", "-", "*", "/", "&", "|", "<", ">", "=", "~",
             "&lt;", "&gt;", "&amp;", "&quot"]
@@ -350,33 +376,34 @@ class JackParser:
             else:
                 #TODO: print ERROR here for non valid format.
                 pass
-            self.indentaionMark -= 1
-            self.writeClosingClause("term")
 
         # Another expression inside
         elif nextToken == '(':
-            self.writeOpenClause("term")
-            self.indentaionMark += 1
-            self.writingSimpleToken() # "moving the openner '(' "
+            self.throwToken() # "moving the openner '(' "
             self.compileExpression()
-            self.writingSimpleToken() # "closing the exp with ')' "
-            self.indentaionMark -= 1
-            self.writeClosingClause("term") # closing the term
+            self.throwToken() # "closing the exp with ')' "
         #unaryOp case
         elif nextToken in { '-', '~'}:
-            self.writeOpenClause("term")
-            self.indentaionMark += 1
-            self.writingSimpleToken()
+            # Pushing the term and then activing the unary operand.
+            typeToken, opernad = self.popToken()
+            vmOp = opDic[opernad]
             self.compileTerm()
-            self.indentaionMark -= 1
-            self.writeClosingClause("term") # closing the term      
+            self.writer.writeArithmetic(vmOp)
         else:
             pass
             #TODO: error we should have atleast one term.
+
         nextTokenType , nextToken = self.rawTokens[0]
         if nextToken in opSet:
-            self.writingSimpleToken()
+            # we push the next term and then call the binary operand on it.
+            typeToken, binaryOp = self.popToken()
             self.compileTerm()
+            vmOp = opDic[binaryOp]
+            if binaryOp in {'+', "&lt;", "&gt;", "&amp;", '|', '='}:
+                self.writer.writeArithmetic()
+            elif binaryOp in {'*', '/'}:
+                ARGS = 2
+                self.writer.writeCall(vmOp, ARGS)
 
         # self reference should be indurable here due to stack poping, checking for op.
                
@@ -384,32 +411,26 @@ class JackParser:
 
     # compiles a (possibly empty) comma seperated list of expressions, not including the ()
     def compileExpressionList(self):
-        self.writeOpenClause("expressionList")
-        self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
         while(nextToken != ')'): # "breaking value adjacent to ';' "
             self.compileExpression()
             nextTokenType, nextToken = self.rawTokens[0]
             if nextToken == ",":
-                self.writingSimpleToken() # "getting to the next exp, removing the , "
-
-        self.indentaionMark -= 1
-        self.writeClosingClause("expressionList")
+                self.throwToken() # "getting to the next exp, removing the , "
 
     # Small function for initiating the project.
     def initProcess(self):
-        self.outFile.write("<class>\n")
-        self.indentaionMark += 1
         self.compileClass()
-        self.indentaionMark -= 1
-        self.outFile.write("</class>")
+
+    """
+    out of office, we only output to the vm now
 
     # Writing into the output file with proper indentation the relevant terminal token.
     def writeWithIndentation(self, type, token):
         delim = self.delim
         offset = self.indentaionMark * delim
         self.outFile.write(offset + "<" + type + "> " + token + " <" + "/" + type + ">\n")
-
+    
     # Opening clause for a non-terminal type.
     def writeOpenClause(self, type):
         delim = self.delim
@@ -420,6 +441,8 @@ class JackParser:
         delim = self.delim
         offset = self.indentaionMark * delim
         self.outFile.write(offset + "</" + type + ">\n")
+    """
+
     #Check whether we have additional tuples.
     def hasAnyTokensLeft(self):
         return (len(self.rawTokens) > 0)
@@ -429,8 +452,9 @@ def main():
     # remove from garbage testing.
     fileName = sys.argv[1]
     listOfTokens = PassingTokenArray(fileName)
-    outFile = fileName[:-5] + "_test.xml"
-    parser = JackParser(listOfTokens, outFile)
+    outFile = fileName[:-5] + ".vm"
+    writerObj = VMWriter(outFile)
+    parser = JackParser(listOfTokens, writerObj)
     parser.initProcess()
 
 if __name__ == "__main__":
@@ -439,6 +463,8 @@ if __name__ == "__main__":
 def parseOneFile(fileName):
     listOfTokens = PassingTokenArray(fileName)
     outFile = fileName[:-5] + ".vm"
-    parser = JackParser(listOfTokens, outFile)
+    writerObj = VMWriter(outFile)
+    classRoot = clssNode()
+    parser = JackParser(listOfTokens, writerObj)
     parser.initProcess()
     
