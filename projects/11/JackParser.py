@@ -353,8 +353,9 @@ class JackParser:
         followTokenType, followToken = self.rawTokens[1]
         # In such a case we should simply push the argument.
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
-            #TODO: handle constants correctly
-            self.wrappingNonTerminalFunc("term", "writingSimpleToken") # we simply compile this term
+            #TODO: handle constants correctly, check if can just push string this way.
+            self.writer.writePush("constant", nextToken)
+            self.wrappingNonTerminalFunc("term", "writingSimpleToken")
             
         #documented in the API   
         elif nextTokenType == "identifier":
