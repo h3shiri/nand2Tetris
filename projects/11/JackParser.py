@@ -38,8 +38,11 @@ class JackParser:
     def __init__(self, listOfTokens, VMWriter, classRoot):
         # Handles all the output for the VM. 
         self.writer = VMWriter
-        # Handles the scopes
+        # The outer class scope object, stays fixed throught the code.
         self.classScope = classRoot
+        # current function scope. TODO:manage this properly from one subroutine to another.
+        self.currentSubScope = None 
+        # all the actual tokens, stright from the tokenizer.
         self.rawTokens = listOfTokens
         # one and not zero due to initial wrappers of XML.
         self.indentaionMark = 0
@@ -50,15 +53,7 @@ class JackParser:
         #the next routine called must be compileClass() which in inside initProcess.
 
     # terminal_types = ["stringConstant", "keyword", "symbol", "integerConstant", "identifier"]
-    # Wrapping function for non-terminal type.
-    def wrappingNonTerminalFunc(self, nonTerminalName, internalFunc):
-        self.writeOpenClause(nonTerminalName)
-        self.indentaionMark += 1
-        tFunc = getattr(self, internalFunc)
-        tFunc()
-        self.indentaionMark -= 1
-        self.writeClosingClause(nonTerminalName)
-
+    
     # returns the requested token as (type, token).
     def popToken(self):
         type, token = self.rawTokens.pop(0)
@@ -112,7 +107,7 @@ class JackParser:
             elif token == '}':
                 self.throwToken()
             else:
-                print("Non Valid format: within clas scope")
+                print("Non Valid format: within clas scope"+'\n')
                 return
 
 
@@ -132,8 +127,6 @@ class JackParser:
     #compiles a method function or constructor        
     def compileSubRoutine(self):
         self.scopeType = "subroutineDec"
-        self.writeOpenClause("subroutineDec")
-        self.indentaionMark += 1
         # writing the fixed strings down such as 'constructor', type, name, '('
         self.writingFewSimpleTokens(4)
         # writing additional optional param list
@@ -142,10 +135,6 @@ class JackParser:
         self.writingSimpleToken()
         # entering the subroutine body.
         self.compileSubroutineBody()
-
-        # Closing tag, TODO: make sure scope is back in place.
-        self.indentaionMark -= 1
-        self.writeClosingClause("subroutineDec")
 
     # compilation function for the subroutine body.
     def compileSubroutineBody(self):
@@ -339,23 +328,51 @@ class JackParser:
             self.wrappingNonTerminalFunc("expression", "compileTerm")
             self.compileTerm()
             nextTokenType, nextToken = self.rawTokens[0]
-            
+    
+    # A utility function helping to clear up the the compileTerm routine.
+    # TODO: fix the 'this' option, perhaps pass the follower token as well for obj refrences.
+    def compileConstantToken(self, nextTokenType, nextToken):
+        if nextTokenType == "stringConstant":
+            # OS: String.new(length)
+            length = len(nextToken)
+            self.writer.writePush("constant", length)
+            self.writer.writeCall("String.new", 1)
+            for x in xrange(length):
+                # pushing the argument for the String.appendChar(nextChar).
+                self.writer.writePush("constant", nextToken[x])
+                self.writer.writeCall("String.appendChar", 1)
+
+        elif nextTokenType == "integerConstant":
+            self.writer.writePush("constant", nextToken)
+
+        elif nextToken in {"null", "false"}:
+            # null and flase are mapped to 0
+            self.writer.writePush("constant", 0)
+        elif nextToken == "true":
+            # true is mapped to -1.
+            self.writer.writePush("constant", 1)
+            self.writer.writeArithmetic("neg")
+        elif nextToken == "this":
+            #TODO: check whether to return the pointer 0, or other obj by the vm. (p.234)
+            pass
+        else:
+            print("non valid constant defenition error"+'\n')
+            return
 
     #See supplied API for more details
     # differentiating between various scenarios (3) using a look ahead token.
     # We also compile additional terms and operands in between.
     def compileTerm(self):
         self.scopeType = "probing For terminals"
-        opSet = {'+', '-', '*', '/', "&lt;", "&gt;", "&amp;", '|', '='}
+        opSet = {'+', '-', '*', '/', "&lt;", "&gt;", "&amp;", '|', '='} # Supported op's
         opDic = {'+': "add", '-':"sub", '*': "Math.multiply", '/':"Math.divide", "&lt;": "lt", "&gt;": "gt",
                 "&amp;": "and", '|': "or", '=': "eq", '-':"neg", '~':"not"}
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
         # In such a case we should simply push the argument.
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
-            #TODO: handle constants correctly, check if can just push string this way.
-            self.writer.writePush("constant", nextToken)
-            self.wrappingNonTerminalFunc("term", "writingSimpleToken")
+            self.scopeType = "simpleTerminal"
+            self.compileConstantToken(nextTokenType, nextToken)
             
         #documented in the API   
         elif nextTokenType == "identifier":
@@ -364,9 +381,17 @@ class JackParser:
             "&lt;", "&gt;", "&amp;", "&quot"]
             if followToken == '[':
                 self.scopeType = "arrayProbing"
-                self.writingFewSimpleTokens(2) # "nameArr , '[' "
-                self.compileExpression()
-                self.writingSimpleToken() # "]"
+                # "nameArr , '[' "
+                type, nameArr = self.popToken()
+                # retrive memory location from symbolTable.
+                arrAtt = self.currentSubScope.getElementAttributes(nameArr) # [Type, Kind (segment), index]
+                debugMsg = "accessing array:" + nameArr
+                # set pointer 1, to the base address of the array from the scope symbol table.
+                self.writer.writePush(arrAtt[1], arrAtt[2], debugMsg) 
+                self.writer.writePop("pointer", 1)
+                self.throwToken() # '['
+                self.compileExpression() # calculating the index.
+                self.throwToken() # "]"
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
@@ -409,7 +434,6 @@ class JackParser:
         # self reference should be indurable here due to stack poping, checking for op.
                
 
-
     # compiles a (possibly empty) comma seperated list of expressions, not including the ()
     def compileExpressionList(self):
         nextTokenType, nextToken = self.rawTokens[0]
@@ -423,26 +447,6 @@ class JackParser:
     def initProcess(self):
         self.compileClass()
 
-    """
-    out of office, we only output to the vm now
-
-    # Writing into the output file with proper indentation the relevant terminal token.
-    def writeWithIndentation(self, type, token):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "<" + type + "> " + token + " <" + "/" + type + ">\n")
-    
-    # Opening clause for a non-terminal type.
-    def writeOpenClause(self, type):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "<" + type + ">" +'\n')
-
-    def writeClosingClause(self, type):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "</" + type + ">\n")
-    """
 
     #Check whether we have additional tuples.
     def hasAnyTokensLeft(self):
@@ -468,4 +472,36 @@ def parseOneFile(fileName):
     classRoot = clssNode()
     parser = JackParser(listOfTokens, writerObj)
     parser.initProcess()
+
+
+    """
+    out of office, we only output to the vm now
+    # Writing into the output file with proper indentation the relevant terminal token.
+    def writeWithIndentation(self, type, token):
+        delim = self.delim
+        offset = self.indentaionMark * delim
+        self.outFile.write(offset + "<" + type + "> " + token + " <" + "/" + type + ">\n")
+    
+    # Opening clause for a non-terminal type.
+    def writeOpenClause(self, type):
+        delim = self.delim
+        offset = self.indentaionMark * delim
+        self.outFile.write(offset + "<" + type + ">" +'\n')
+
+    def writeClosingClause(self, type):
+        delim = self.delim
+        offset = self.indentaionMark * delim
+        self.outFile.write(offset + "</" + type + ">\n")
+    """
+    # Wrapping function for non-terminal type.
+    """
+    out of order, no xml output in thix ex
+    def wrappingNonTerminalFunc(self, nonTerminalName, internalFunc):
+        self.writeOpenClause(nonTerminalName)
+        self.indentaionMark += 1
+        tFunc = getattr(self, internalFunc)
+        tFunc()
+        self.indentaionMark -= 1
+        self.writeClosingClause(nonTerminalName)
+    """
     
