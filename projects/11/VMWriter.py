@@ -4,7 +4,7 @@ class Translator:
 	various statemnt to basic VM language pop/push the whole party.
 	"""
 
-	def __init__(self, fileName):
+	def __init__(self, outfileName):
 
 		self.outFile = open(outfileName, 'w')
 		"""
@@ -71,7 +71,7 @@ class Translator:
 
 	# Writing a vm function declaration.
 	def writeFunction(self, funcName, nLocals, debug = None):
-		string = "function" + " " + funcName + " " + str(nArgs)
+		string = "function" + " " + funcName + " " + str(nLocals)
 		string = self.commentIntoVMCode(string, debug)
 		self.outFile.write(string)
 
@@ -88,7 +88,7 @@ class Translator:
 	# A utility function for editing an exisiting string according to a debug flag.
 	def commentIntoVMCode(self, strTarget, debug = None):
 		if debug != None:
-			string += (" //" + str(debug) + '\n')
+			strTarget += (" //" + str(debug) + '\n')
 		else:
-			string += '\n'
-		return string
+			strTarget += '\n'
+		return strTarget

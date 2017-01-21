@@ -1,6 +1,6 @@
 from JackTokenizer import *
 from SymbolTable import *
-from VMWriter import *
+import VMWriter
 #TODO: EX11 - upgarde the xml to include new vals for the proper tree building process.
 #TODO: switch from xml output to the proper vm output, and slowly change this code (debuging the vm would be inconvenient) 
 
@@ -26,6 +26,9 @@ ScopeTypes = [
     "statements", "whileStatement", "ifStatement", "returnStatement", "letStatement", "doStatement"
     "expression", "term", "expressionList"    
     ]
+
+
+
 """
 class JackParser:
 
@@ -38,10 +41,13 @@ class JackParser:
     def __init__(self, listOfTokens, VMWriter, classRoot):
         # Handles all the output for the VM. 
         self.writer = VMWriter
+        self.popped = []
         # The outer class scope object, stays fixed throught the code.
         self.classScope = classRoot
+        self.className = ''
         # current function scope. TODO:manage this properly from one subroutine to another.
-        self.currentSubScope = None 
+        self.currentSubScope = None
+        self.subRoutineCounter = 0
         # all the actual tokens, stright from the tokenizer.
         self.rawTokens = listOfTokens
         # one and not zero due to initial wrappers of XML.
@@ -61,20 +67,28 @@ class JackParser:
 
     # Simple function for throwing out the non useful tokens.
     def throwToken(self):
+
         trashType, trashTOken = self.rawTokens.pop(0)
+        self.popped.append(trashTOken)
 
     # TODO: acually erase this statement from the code.
     # Utility function for processing the next tokens simply as they are into the xml file.
     def writingSimpleToken(self):
+        if len(self.rawTokens) == 0:
+            return
         type, token = self.rawTokens.pop(0)
+        self.popped.append(token)
+        return type, token
         # We don't need to write anymore to the xml.
-        # self.writeWithIndentation(type, token)
 
     
     # throwing several noncompiled elements to the trash basically.
     def writingFewSimpleTokens(self, iterations):
+        tokens = []
         for i in range(iterations):
-            self.writingSimpleToken()
+            tokens.append(self.writingSimpleToken())
+        return tokens
+
 
     #compiles a complete class
     def compileClass(self):
@@ -82,12 +96,11 @@ class JackParser:
         # getting the T('class'), K(name) and T('{')
         self.throwToken()
         type, token = self.popToken()
-        self.classScope.setName(token)
+        self.className = token
+        self.classScope.classTableRoot.setName(token)
         self.throwToken()
-
         #In case we have more tokens we proceed, to the classVarDec or subroutineDec 
         while(self.hasAnyTokensLeft()):
-            
             type, token = self.rawTokens[0]
             # Variables declarations.
             if token in {"field", "static"}:
@@ -107,97 +120,113 @@ class JackParser:
             elif token == '}':
                 self.throwToken()
             else:
-                print("Non Valid format: within clas scope"+'\n')
+                print("Non Valid format: within clasד scope"+'\n')
                 return
 
 
     #Compiles a static or field declaration
     def compileClassVarDec(self):
         self.scopeType = "ClassVarDec"
-        self.writeOpenClause("classVarDec")
-        self.indentaionMark += 1
         #writing the apprprpriate static/field string.
         self.writingSimpleToken()
         # dealing with the variables list.
         self.compileVariables()
-        self.indentaionMark -= 1
         # Closing tag, scope has been reduced back in compileVariables.
-        self.writeClosingClause("classVarDec")
 
     #compiles a method function or constructor        
     def compileSubRoutine(self):
         self.scopeType = "subroutineDec"
         # writing the fixed strings down such as 'constructor', type, name, '('
-        self.writingFewSimpleTokens(4)
+        tokens = self.writingFewSimpleTokens(4)
         # writing additional optional param list
-        self.compileParametersList()
+        self.name = self.className + "." + tokens[2][1]
+        self.classScope.startSubroutine(self.name)
+        self.classScope.setCurScope(self.name)
+        type = tokens[0][1] #type is function/method/constructor
+        self.compileParametersList(type)
+
         #the closing brackets ')'
         self.writingSimpleToken()
+
         # entering the subroutine body.
-        self.compileSubroutineBody()
+        self.compileSubroutineBody(type)
+
 
     # compilation function for the subroutine body.
-    def compileSubroutineBody(self):
+    def compileSubroutineBody(self, type):
+        self.writingSimpleToken()
+
         self.scopeType = "subroutineBody"
-        self.writeOpenClause("subroutineBody")
-        self.indentaionMark += 1
-        self.writingSimpleToken() # '{'
+
         # covering all the variables declarations.
         nextTokenType, nextToken = self.rawTokens[0]
+
         while (nextToken == "var"):
             self.compileVarDec()
             nextTokenType, nextToken = self.rawTokens[0]
 
+        numVars = self.classScope.getCurScope().VarCount('var')
+        self.writer.writeFunction(self.name, numVars)
+        if type == "method":
+            self.writer.writePush('argument', 0)
+            self.writer.writePop('pointer', 0)
+        if type == 'constructor':
+            globalVars = self.classScope.VarCount('field')
+            self.writer.writePush('constant', globalVars)
+            self.writer.writeCall('Memory.alloc', 1)
+            self.writer.writePop('pointer', 0)
         # compiling the various statements
         self.compileStatements()
 
         self.writingSimpleToken() # '}'
         #closing tag
-        self.indentaionMark -= 1
-        self.writeClosingClause("subroutineBody")
+        self.scopeType = 'class'
+        self.classScope.setCurScope('class')
 
     #compiles a parameters list, not including the enclosing "()"
-    def compileParametersList(self):
+    def compileParametersList(self, type):
+
+        if type == 'method':
+            self.classScope.getCurScope().AddLabel('argument', 'self', 'this')
         self.scopeType = "parameterList"
-        self.writeOpenClause("parameterList")
-        self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
+
         while(nextToken != ')'):
-            self.writingSimpleToken()
+            type = self.writingSimpleToken()
+            if(type[1] == ","):
+                type = self.writingSimpleToken()
+            name = self.writingSimpleToken()
+            self.classScope.getCurScope().addLabel('argument', type[1], name[1])
             nextTokenType, nextToken = self.rawTokens[0]
-        self.indentaionMark -= 1
-        self.writeClosingClause("parameterList")
-            
-    # Compiling a sequence of variables including the ';'       
+
+
+    # Compiling a sequence of variables including the ';'
     def compileVariables(self):
         self.scopeType = "variablesList"
         # begin by writing first mendatory first variable type and name.
-        self.writingFewSimpleTokens(2)
+        type, name = self.writingFewSimpleTokens(2)
+        self.classScope.getCurScope().addLabel('var', type[1], name[1])
         #we are going to iterate until we reach a semicolon.
-        nextTokenType, nextToken = self.rawTokens.pop(0)
+        nextTokenType, nextToken = self.writingSimpleToken()
         while (nextToken != ';'):
-            self.writeWithIndentation(nextTokenType, nextToken)
-            nextTokenType, nextToken = self.rawTokens.pop(0)
-        # inserting the semicolon
-        self.writeWithIndentation(nextTokenType, nextToken)
+            name = self.writingSimpleToken()
+            if(name[1] == ";"):
+                break
+            self.classScope.getCurScope().addLabel('var', type[1], name[1])
+            nextTokenType, nextToken = self.writingSimpleToken()
 
     #Compiles a var declaration
     def compileVarDec(self):
         self.scopeType = "varDec"
-        self.writeOpenClause("varDec")
-        self.indentaionMark += 1
         #writing the 'var' string.
-        self.writingSimpleToken()
+        token = self.writingSimpleToken()
         self.compileVariables()
-        self.indentaionMark -= 1
-        self.writeClosingClause("varDec")
-        
+
+
     #Compiles a sequence of statements, not including the enclosing "{}"
     def compileStatements(self):
-        self.writeOpenClause("statements")
-        self.indentaionMark += 1
         nextTokenType, nextToken = self.rawTokens[0]
-        SOS = {"let", "if", "while", "do", "return"} # "abbreviation  StatementOpennerSet"
+        SOS = {"let", "if", "while", "do", "return"} # "abbreviation  StatementOpenerSet"
         while nextToken in SOS:
             if nextToken == "let":
                 self.compileLet()
@@ -215,48 +244,97 @@ class JackParser:
             # Updating for next iteration.
             nextTokenType, nextToken = self.rawTokens[0]
 
-        self.indentaionMark -= 1
-        self.writeClosingClause("statements")
 
     #compiles a do statement
     def compileDo(self):
         self.scopeType = "doStatemnt"
-        self.writeOpenClause("doStatement")
+       # self.writeOpenClause("doStatement")
         self.indentaionMark += 1
         # Unloading the 'do', subroutineName.
         self.writingSimpleToken()
         # compiling the subroutine.
         self.compileSubroutineCall()
+        self.writer.writePop('temp', 0)
         self.writingSimpleToken() # "catching the semicolon from the do statement"
         # Closing the expression list
         self.indentaionMark -= 1
-        self.writeClosingClause("doStatement")
+
+       # self.writeClosingClause("doStatement")
 
     def compileSubroutineCall(self):
+        numLocals = 0
+        left = right = full = ''
         nextTokenType, nextToken = self.rawTokens[0]
+        left = nextToken
         followerType, followerToken = self.rawTokens[1]
         if followerToken == '(':
             # case one subroutine name and calling expList.
+            self.writer.writePush('pointer', 0)
+            numLocals += 1
+            full =  self.classScope.getName() + left
             self.scopeType = "subroutineLocalMethodCall"
             self.writingFewSimpleTokens(2)
+            self.classScope.startSubroutine()
+            self.subRoutineCounter += 1
+
         elif followerToken == '.':
             self.scopeType = "foreignFunctionCall"
             # calling foreign method aka nameV + '.' + nameM + '('
-            self.writingFewSimpleTokens(4)
+            tokens = self.writingFewSimpleTokens(4)
+            right = tokens[2][1]
+            if left in self.classScope.getCurScope().elements or left in self.classScope.classTableRoot.elements:
+                self.pushHelper(left)
+                full = self.classScope.typeOf(left) + "." + right
+                numLocals += 1
+            else:
+                full = left + '.' + right
+            self.classScope.startSubroutine(full)
+            table = self.classScope.getSubroutine(self.subRoutineCounter)
+            self.subRoutineCounter += 1
+
         else:
             #TODO: non-valid function call ERROR
             pass
+        numLocals += self.compileExpressionList()
 
-        self.compileExpressionList()
+        self.writer.writeCall(full, numLocals)
         self.writingSimpleToken() # "closing bracket for the expL ')"
 
+    def pushHelper(self, left):
+        if left in self.classScope.getCurScope().getLocalLabels():
+            if self.classScope.getCurScope().KindOf(left) == 'var':
+                self.writer.writePush('local', self.classScope.getCurScope().IndexOf(left))
+            elif self.classScope.getCurScope().KindOf(left) == 'arg':
+                self.writer.writePush('argument', self.classScope.getCurScope().IndexOf(left))
+        else:
+            if self.classScope.getCurScope().KindOf(left) == 'static':
+                self.writer.writePush('static', self.classScope.getCurScope().IndexOf(left))
+            else:
+                self.writer.writePush('this', self.classScope.getCurScope().IndexOf(left))
+
+    def popHelper(self, name):
+        print(self.classScope.getCurScope().scopeName)
+        if name in self.classScope.getCurScope().getLocalLabels():
+            if self.classScope.getCurScope().KindOf(name) == 'var':
+                self.writer.writePop('local', self.classScope.getCurScope().IndexOf(name))
+            elif self.classScope.getCurScope().KindOf(name) == 'argument':
+                self.writer.writePop('argument', self.classScope.getCurScope().IndexOf(name))
+        else:
+            if self.classScope.getCurScope().KindOf(name) == 'static':
+                self.writer.writePop('static', self.classScope.getCurScope().IndexOf(name))
+            else:
+                self.writer.writePop('this', self.classScope.getCurScope().IndexOf(name))
     #compiles a let statement
     def compileLet(self):
+        self.writingSimpleToken() # remove the let
+
+
         self.scopeType = "letStatement"
-        self.writeOpenClause("letStatement")
-        self.indentaionMark += 1
         # unloading the "let", and varName
-        self.writingFewSimpleTokens(2)
+        tokens = self.writingFewSimpleTokens(2)
+
+
+        name = tokens[0][1]
         nextTokenType, nextToken = self.rawTokens[0]
         if (nextToken == '['): # " '[' exp ']' "
             self.scopeType = "arrayInLetStatement"
@@ -265,70 +343,83 @@ class JackParser:
             self.writingSimpleToken()
 
         # getting into the subsitution part
-        self.writingSimpleToken() # "the equality"
         self.compileExpression()
         self.writingSimpleToken() # "getting the semicolon"
-        self.indentaionMark -= 1
-        self.writeClosingClause("letStatement")
+
+        self.popHelper(name)
 
     # compiling the while condition
     def compileWhile(self):
         self.scopeType = "whileStatement"
-        self.writeOpenClause("whileStatement")
-        self.indentaionMark += 1
         # unload the "while" and '('
         self.writingFewSimpleTokens(2)
+        counter = self.classScope.getCurScope().whileCounter
+        self.classScope.getCurScope().whileCounter += 1
+        self.writer.writeLabel('WHILE_EXP' + str(counter))
         self.compileExpression()
+        self.writer.writeArithmetic('not')
+        self.writer.writeIf('WHILE_END' + str(counter))
         self.writingFewSimpleTokens(2) # "closing ')' and openning '{' "
         self.compileStatements()
+        self.writer.writeGoto('WHILE_EXP' + str(counter))
+        self.writer.writeLabel('WHILE_END' + str(counter))
         self.writingSimpleToken() # "closing '}' "
-        self.indentaionMark -= 1
-        self.writeClosingClause("whileStatement")
 
     # compiling a return statement
     def compileReturn(self):
         self.scopeType = "returnScope"
-        self.writeOpenClause("returnStatement")
-        self.indentaionMark += 1
         # unloading the 'return' str
         self.writingSimpleToken()
+
         # probing for an expression.
         nextTokenType, nextToken = self.rawTokens[0]
+        retFlag = True
+        if nextToken == ";":
+            retFlag = False
+            self.writer.writePush('constant', 0)
+            self.writer.writeReturn() #CHECK THIS TOMORROW
+        #CONTINUE FORM HERE
         if nextToken != ';':
             self.compileExpression()
         self.writingSimpleToken() # "reaching for the semicolon"
-        self.indentaionMark -= 1
-        self.writeClosingClause("returnStatement")
 
     # compiling the if statement and including the possibility for else.
     def compileIf(self):
         self.scopeType = "ifStatement"
-        self.writeOpenClause("ifStatement")
-        self.indentaionMark += 1
         self.writingFewSimpleTokens(2) # "if and '('"
         self.compileExpression()
         self.writingFewSimpleTokens(2) # "closing ')' and opening '{'"
+        counter = self.classScope.getCurScope().ifCounter
+        self.classScope.getCurScope().ifCounter += 1
+        self.writer.writeIf('IF_TRUE' + str(counter))
+        self.writer.writeGoto('IF_FALSE' + str(counter))
+        self.writer.writeLabel('IF_TRUE' + str(counter))
         self.compileStatements()
         self.writingSimpleToken() # " closing '}' "
         # probing for an "else" token
         nextTokenType, nextToken = self.rawTokens[0]
         if nextToken == "else":
             self.writingFewSimpleTokens(2)
+            self.writer.writeGoto('IF_END' + str(counter))
+            self.writer.writeLabel('IF_FALSE' + str(counter))
             self.compileStatements()
             self.writingSimpleToken()
-
-        self.indentaionMark -= 1
-        self.writeClosingClause("ifStatement")
+            self.writer.writeLabel('IF_END' + str(counter))
+        else:
+            self.writer.writeLabel('IF_FALSE' + str(counter))
 
     # compiling an expression we have atleast one term, not including out most encapsulating ().
     def compileExpression(self):
+
         nextTokenType, nextToken = self.rawTokens[0]
+
         while (nextToken not in {')', ',', ']', ';'}):
             self.scopeType = "insideAnExp"
-            self.wrappingNonTerminalFunc("expression", "compileTerm")
+       #     self.wrappingNonTerminalFunc("expression", "compileTerm")
             self.compileTerm()
+
             nextTokenType, nextToken = self.rawTokens[0]
-    
+
     # A utility function helping to clear up the the compileTerm routine.
     # TODO: fix the 'this' option, perhaps pass the follower token as well for obj refrences.
     def compileConstantToken(self, nextTokenType, nextToken):
@@ -337,28 +428,30 @@ class JackParser:
             length = len(nextToken)
             self.writer.writePush("constant", length)
             self.writer.writeCall("String.new", 1)
-            for x in xrange(length):
+            for x in range(length):
                 # pushing the argument for the String.appendChar(nextChar).
                 self.writer.writePush("constant", nextToken[x])
                 self.writer.writeCall("String.appendChar", 1)
-
+            self.popToken()
         elif nextTokenType == "integerConstant":
             self.writer.writePush("constant", nextToken)
-
+            self.popToken()
         elif nextToken in {"null", "false"}:
             # null and flase are mapped to 0
             self.writer.writePush("constant", 0)
+            self.popToken()
         elif nextToken == "true":
             # true is mapped to -1.
-            self.writer.writePush("constant", 1)
-            self.writer.writeArithmetic("neg")
+            self.writer.writePush("constant", 0)
+            self.writer.writeArithmetic("not")
+            self.popToken()
+
         elif nextToken == "this":
             #TODO: check whether to return the pointer 0, or other obj by the vm. (p.234)
             pass
         else:
             print("non valid constant defenition error"+'\n')
             return
-
     #See supplied API for more details
     # differentiating between various scenarios (3) using a look ahead token.
     # We also compile additional terms and operands in between.
@@ -369,13 +462,15 @@ class JackParser:
                 "&amp;": "and", '|': "or", '=': "eq", '-':"neg", '~':"not"}
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
+
         # In such a case we should simply push the argument.
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
             self.scopeType = "simpleTerminal"
             self.compileConstantToken(nextTokenType, nextToken)
-            
+
         #documented in the API   
         elif nextTokenType == "identifier":
+            numLocals = 0
             symbols1 = [
             "{","}", "(", ")", "[", "]", ".", ",", ";", "+", "-", "*", "/", "&", "|", "<", ">", "=", "~",
             "&lt;", "&gt;", "&amp;", "&quot"]
@@ -426,7 +521,7 @@ class JackParser:
             self.compileTerm()
             vmOp = opDic[binaryOp]
             if binaryOp in {'+', "&lt;", "&gt;", "&amp;", '|', '='}:
-                self.writer.writeArithmetic()
+                self.writer.writeArithmetic(vmOp)
             elif binaryOp in {'*', '/'}:
                 ARGS = 2
                 self.writer.writeCall(vmOp, ARGS)
@@ -436,13 +531,16 @@ class JackParser:
 
     # compiles a (possibly empty) comma seperated list of expressions, not including the ()
     def compileExpressionList(self):
+        num = 0
         nextTokenType, nextToken = self.rawTokens[0]
+
         while(nextToken != ')'): # "breaking value adjacent to ';' "
+            num += 1
             self.compileExpression()
             nextTokenType, nextToken = self.rawTokens[0]
             if nextToken == ",":
                 self.throwToken() # "getting to the next exp, removing the , "
-
+        return num
     # Small function for initiating the project.
     def initProcess(self):
         self.compileClass()
@@ -458,8 +556,9 @@ def main():
     fileName = sys.argv[1]
     listOfTokens = PassingTokenArray(fileName)
     outFile = fileName[:-5] + ".vm"
-    writerObj = VMWriter(outFile)
-    parser = JackParser(listOfTokens, writerObj)
+    writerObj = VMWriter.Translator(outFile)
+    classRoot = clssNode()
+    parser = JackParser(listOfTokens, writerObj,classRoot)
     parser.initProcess()
 
 if __name__ == "__main__":
@@ -468,9 +567,9 @@ if __name__ == "__main__":
 def parseOneFile(fileName):
     listOfTokens = PassingTokenArray(fileName)
     outFile = fileName[:-5] + ".vm"
-    writerObj = VMWriter(outFile)
+    writerObj = VMWriter.Translator(outFile)
     classRoot = clssNode()
-    parser = JackParser(listOfTokens, writerObj)
+    parser = JackParser(listOfTokens, writerObj, classRoot)
     parser.initProcess()
 
 

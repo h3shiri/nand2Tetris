@@ -7,10 +7,11 @@ class SymbolTable:
 	where each node is a given 
 	All tree traversing should be done with such objects as nodes. 
 	"""
-	TYPE = 0
-	KIND = 1
-	INDEX = 2
+
 	def __init__(self, fatherScope = None, scopeType = None):
+		self.TYPE = 0
+		self.KIND = 1
+		self.INDEX = 2
 		# Here we have a ref to the father scope.
 		self.fatherScope = fatherScope
 		# Should be set on "class" or "subroutine".
@@ -20,6 +21,8 @@ class SymbolTable:
 		self.fieldCounter = 0
 		self.argumentCounter = 0
 		self.varCounter = 0
+		self.ifCounter = 0
+		self.whileCounter = 0
 		# A dictionary, the keys are the labels names and they point to various flags.
 		# name -> [Type, Kind, index]
 		self.elements = dict()
@@ -32,6 +35,7 @@ class SymbolTable:
 
 	# Addidng a label to the current scope.	 
 	def addLabel(self, kind, type, name):
+		#print(kind, " ", type, " ",  name)
 		classKinds = {"static", "field"}
 		subroutineKinds = {"argument", "var"}
 		# If we try to define an already existing label
@@ -47,26 +51,31 @@ class SymbolTable:
 			# TODO: non appropriate scope error.
 
 		offset = self.VarCount(kind)
+
 		#Updating the ofset value in this scope
 		self.offsets[kind] += 1
 		# Inserting the relevant values in our table.
 		self.elements[name] = [type, kind, offset]
-	
+		#print(self.scopeName)
+		#print(self.elements)
+
+
 	# Returning how many of this kind we have already defined
 	def VarCount(self, kind):
 		return self.offsets[kind]
 	
 	# Returns relevent kind, if label exists in this Scope, else returns None.
 	def KindOf(self, name):
-		return self.localAttributeGetter(name, KIND)
+		return self.localAttributeGetter(name, self.KIND)
 
 	# Returns relevent type, if label exists in this Scope, else returns None.
 	def TypeOf(self, name):
-		return self.localAttributeGetter(name, TYPE)
+		return self.localAttributeGetter(name, self.TYPE)
 
 	# Returns relevent index, if label exists in this Scope, else returns None.
 	def IndexOf(self, name):
-		return self.localAttributeGetter(name, INDEX)
+
+		return self.localAttributeGetter(name, self.INDEX)
 
 	# A utility function for all the getter attributes functions (TypeOf, IndexOf, KindOf)
 	def localAttributeGetter(self, name, attrIndex):
@@ -114,8 +123,6 @@ class SymbolTable:
 
 
 
-#TODO: check the scope limitation is it actually just class and subroutine scopes (2)
-#which means no internal declarations this makes our ordeal significantly simpler??
 class clssNode:
 	"""
 	This class represent our parsing tree.
@@ -125,12 +132,33 @@ class clssNode:
 	"""
 	def __init__(self):
 		self.classTableRoot = SymbolTable(None, "class") # Class Scope Node
-		self.subroutineScopes = [] # fill this up as you parse the file.
-	
+		self.subroutineScopes = {} # fill this up as you parse the file.
+		self.curScope = self.classTableRoot
 
-	def startSubroutine(self):
+	def startSubroutine(self, name):
 		newSubroutineScope = SymbolTable(self.classTableRoot, "subroutine")
-		self.subroutineScopes.append(newSubroutineScope)
+		newSubroutineScope.scopeName = name
+		self.subroutineScopes[newSubroutineScope.scopeName] = newSubroutineScope
+		#self.curScope = self.subroutineScopes[len(self.subroutineScopes) - 1]
+
+	def getCurScope(self):
+		return self.curScope
+
+	def setCurScope(self, name):
+		#print("scope is now ", name)
+		if name == 'class':
+			self.curScope = self.classTableRoot
+			return
+		self.curScope = self.subroutineScopes[name]
+
+	def typeOf(self, name):
+		return self.curScope.TypeOf(name)
+	def getName(self):
+		return self.classTableRoot.scopeName
+
+	def getSubroutine(self, index):
+		pass
+#		return self.subroutineScopes[len(self.subroutineScopes)- 1]
 
 	"""
 	@name: A new identifier representing the label name
