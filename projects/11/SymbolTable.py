@@ -132,9 +132,10 @@ class clssNode:
 	"""
 	def __init__(self):
 		self.classTableRoot = SymbolTable(None, "class") # Class Scope Node
-		self.subroutineScopes = {} # fill this up as you parse the file.
+		self.subroutineScopes = dict() # fill this up as you parse the file
 		self.curScope = self.classTableRoot
 
+	#TODO: watch where u open a new slate danger of override.
 	def startSubroutine(self, name):
 		newSubroutineScope = SymbolTable(self.classTableRoot, "subroutine")
 		newSubroutineScope.scopeName = name

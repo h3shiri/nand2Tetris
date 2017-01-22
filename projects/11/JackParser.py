@@ -48,12 +48,14 @@ class JackParser:
         # current function scope. TODO:manage this properly from one subroutine to another.
         self.currentSubScope = None
         self.subRoutineCounter = 0
+
+        # The relevant utility flags (p.243)
+        self.letFlag = False
+        # Ambiguity in case of terms for '-'
+        self.minusAmbiguityFlag = False
+
         # all the actual tokens, stright from the tokenizer.
         self.rawTokens = listOfTokens
-        # one and not zero due to initial wrappers of XML.
-        self.indentaionMark = 0
-        # the given delimeter. TODO: check if you can use a library to fix possible indentation.
-        self.delim = "  "
         # Refering to the relational scope location
         self.scopeType = ""
         #the next routine called must be compileClass() which in inside initProcess.
@@ -120,7 +122,7 @@ class JackParser:
             elif token == '}':
                 self.throwToken()
             else:
-                print("Non Valid format: within clasד scope"+'\n')
+                print("Non Valid format: within class scope"+'\n')
                 return
 
 
@@ -154,7 +156,7 @@ class JackParser:
 
     # compilation function for the subroutine body.
     def compileSubroutineBody(self, type):
-        self.writingSimpleToken()
+        self.throwToken() # moving the openner '{'
 
         self.scopeType = "subroutineBody"
 
@@ -178,7 +180,7 @@ class JackParser:
         # compiling the various statements
         self.compileStatements()
 
-        self.writingSimpleToken() # '}'
+        self.throwToken() # '}'
         #closing tag
         self.scopeType = 'class'
         self.classScope.setCurScope('class')
@@ -248,18 +250,13 @@ class JackParser:
     #compiles a do statement
     def compileDo(self):
         self.scopeType = "doStatemnt"
-       # self.writeOpenClause("doStatement")
-        self.indentaionMark += 1
         # Unloading the 'do', subroutineName.
-        self.writingSimpleToken()
+        self.throwToken()
         # compiling the subroutine.
         self.compileSubroutineCall()
         self.writer.writePop('temp', 0)
-        self.writingSimpleToken() # "catching the semicolon from the do statement"
-        # Closing the expression list
-        self.indentaionMark -= 1
-
-       # self.writeClosingClause("doStatement")
+        self.throwToken() # "catching the semicolon from the do statement"
+        
 
     def compileSubroutineCall(self):
         numLocals = 0
@@ -273,8 +270,8 @@ class JackParser:
             numLocals += 1
             full =  self.classScope.getName() + left
             self.scopeType = "subroutineLocalMethodCall"
-            self.writingFewSimpleTokens(2)
-            self.classScope.startSubroutine()
+            self.writingFewSimpleTokens(2) # TODO: what are we throwing here ??
+            # self.classScope.startSubroutine(missing name) , TODO: removing override.
             self.subRoutineCounter += 1
 
         elif followerToken == '.':
@@ -282,59 +279,58 @@ class JackParser:
             # calling foreign method aka nameV + '.' + nameM + '('
             tokens = self.writingFewSimpleTokens(4)
             right = tokens[2][1]
-            if left in self.classScope.getCurScope().elements or left in self.classScope.classTableRoot.elements:
-                self.pushHelper(left)
-                full = self.classScope.typeOf(left) + "." + right
-                numLocals += 1
-            else:
-                full = left + '.' + right
-            self.classScope.startSubroutine(full)
-            table = self.classScope.getSubroutine(self.subRoutineCounter)
+            full = left + '.' + right
+            # self.classScope.startSubroutine(full) #WATCH: this causes an aweful override.
+            # table = self.classScope.getSubroutine(self.subRoutineCounter) #WATCH: non applied misplaced function.
             self.subRoutineCounter += 1
 
         else:
-            #TODO: non-valid function call ERROR
-            pass
+            print("non-valid function call - ERROR\n")
+            return
         numLocals += self.compileExpressionList()
 
         self.writer.writeCall(full, numLocals)
-        self.writingSimpleToken() # "closing bracket for the expL ')"
-
-    def pushHelper(self, left):
-        if left in self.classScope.getCurScope().getLocalLabels():
-            if self.classScope.getCurScope().KindOf(left) == 'var':
-                self.writer.writePush('local', self.classScope.getCurScope().IndexOf(left))
-            elif self.classScope.getCurScope().KindOf(left) == 'arg':
-                self.writer.writePush('argument', self.classScope.getCurScope().IndexOf(left))
+        self.throwToken() # "closing bracket for the expL ')"
+    
+    def pushHelper(self, labelName):
+        #TODO: remove redundant prints
+        print(self.classScope.getCurScope().scopeName)
+        if labelName in self.classScope.getCurScope().getLocalLabels():
+            if self.classScope.getCurScope().KindOf(labelName) == 'var':
+                self.writer.writePush('local', self.classScope.getCurScope().IndexOf(labelName))
+            elif self.classScope.getCurScope().KindOf(labelName) == 'argument':
+                self.writer.writePush('argument', self.classScope.getCurScope().IndexOf(labelName))
         else:
-            if self.classScope.getCurScope().KindOf(left) == 'static':
-                self.writer.writePush('static', self.classScope.getCurScope().IndexOf(left))
+            if self.classScope.getCurScope().KindOf(labelName) == 'static':
+                self.writer.writePush('static', self.classScope.getCurScope().IndexOf(labelName))
             else:
-                self.writer.writePush('this', self.classScope.getCurScope().IndexOf(left))
+                self.writer.writePush('this', self.classScope.getCurScope().IndexOf(labelName))
 
     def popHelper(self, name):
+        #TODO: remove redundant prints
         print(self.classScope.getCurScope().scopeName)
+
         if name in self.classScope.getCurScope().getLocalLabels():
-            if self.classScope.getCurScope().KindOf(name) == 'var':
-                self.writer.writePop('local', self.classScope.getCurScope().IndexOf(name))
+            tempKind = self.classScope.getCurScope().KindOf(name)
+            tempIndex = self.classScope.getCurScope().IndexOf(name)
+            if tempKind == 'var':
+                self.writer.writePop('local', tempIndex)
             elif self.classScope.getCurScope().KindOf(name) == 'argument':
-                self.writer.writePop('argument', self.classScope.getCurScope().IndexOf(name))
+                self.writer.writePop('argument', tempIndex)
         else:
             if self.classScope.getCurScope().KindOf(name) == 'static':
                 self.writer.writePop('static', self.classScope.getCurScope().IndexOf(name))
             else:
                 self.writer.writePop('this', self.classScope.getCurScope().IndexOf(name))
-    #compiles a let statement
+
+    # compiles a let statement
     def compileLet(self):
-        self.writingSimpleToken() # remove the let
-
-
+        self.throwToken() # remove the let
+        self.letFlag = True # flag for indicating a defenition in place.
         self.scopeType = "letStatement"
-        # unloading the "let", and varName
-        tokens = self.writingFewSimpleTokens(2)
+        # unloading the varName
+        tokenType, name = self.popToken()
 
-
-        name = tokens[0][1]
         nextTokenType, nextToken = self.rawTokens[0]
         if (nextToken == '['): # " '[' exp ']' "
             self.scopeType = "arrayInLetStatement"
@@ -344,9 +340,9 @@ class JackParser:
 
         # getting into the subsitution part
         self.compileExpression()
-        self.writingSimpleToken() # "getting the semicolon"
-
+        self.throwToken() # "getting the semicolon"
         self.popHelper(name)
+        self.letFlag = False # turning of the flag
 
     # compiling the while condition
     def compileWhile(self):
@@ -377,7 +373,7 @@ class JackParser:
         if nextToken == ";":
             retFlag = False
             self.writer.writePush('constant', 0)
-            self.writer.writeReturn() #CHECK THIS TOMORROW
+            self.writer.writeReturn() #TODO: CHECK THIS TOMORROW
         #CONTINUE FORM HERE
         if nextToken != ';':
             self.compileExpression()
@@ -415,10 +411,30 @@ class JackParser:
 
         while (nextToken not in {')', ',', ']', ';'}):
             self.scopeType = "insideAnExp"
-       #     self.wrappingNonTerminalFunc("expression", "compileTerm")
             self.compileTerm()
-
             nextTokenType, nextToken = self.rawTokens[0]
+
+    """
+    A utility function for compile term,
+    retriving from the symbol table and pushing to the relevant segment.
+    @nextToken - the relevant identifier name.
+    @comment - the token type is identifier.
+    potential additional flags see p.243.
+    TODO: pimp this function, properly.
+    """
+    def compileSimpleVariable(self, nextToken):
+        if self.currentSubScope != None:
+            if nextToken in self.currentSubScope.getLocalLabels():
+                self.pushHelper(nextToken)
+                self.throwToken() # the label ha been processed.
+                return # avoiding the chance of double poping.
+
+        if nextToken in self.classScope.getCurScope().getLocalLabels():
+            self.pushHelper(nextToken)
+            self.throwToken()
+        else:
+            print("non existing label\n")
+
 
     # A utility function helping to clear up the the compileTerm routine.
     # TODO: fix the 'this' option, perhaps pass the follower token as well for obj refrences.
@@ -432,22 +448,23 @@ class JackParser:
                 # pushing the argument for the String.appendChar(nextChar).
                 self.writer.writePush("constant", nextToken[x])
                 self.writer.writeCall("String.appendChar", 1)
-            self.popToken()
+            self.throwToken()
         elif nextTokenType == "integerConstant":
             self.writer.writePush("constant", nextToken)
-            self.popToken()
+            self.throwToken()
         elif nextToken in {"null", "false"}:
             # null and flase are mapped to 0
             self.writer.writePush("constant", 0)
-            self.popToken()
+            self.throwToken()
         elif nextToken == "true":
             # true is mapped to -1.
             self.writer.writePush("constant", 0)
             self.writer.writeArithmetic("not")
-            self.popToken()
+            self.throwToken()
 
         elif nextToken == "this":
             #TODO: check whether to return the pointer 0, or other obj by the vm. (p.234)
+            #retrive from symbolTable should be at pointer 0. (effects methods and constructors)
             pass
         else:
             print("non valid constant defenition error"+'\n')
@@ -458,11 +475,13 @@ class JackParser:
     def compileTerm(self):
         self.scopeType = "probing For terminals"
         opSet = {'+', '-', '*', '/', "&lt;", "&gt;", "&amp;", '|', '='} # Supported op's
-        opDic = {'+': "add", '-':"sub", '*': "Math.multiply", '/':"Math.divide", "&lt;": "lt", "&gt;": "gt",
-                "&amp;": "and", '|': "or", '=': "eq", '-':"neg", '~':"not"}
+        opDic = {'+': "add", '*': "Math.multiply", '/':"Math.divide", "&lt;": "lt", "&gt;": "gt",
+                "&amp;": "and", '|': "or", '=': "eq", '-':"neg", '~':"not"} # Note sub require override in real time.
         nextTokenType, nextToken = self.rawTokens[0]
         followTokenType, followToken = self.rawTokens[1]
-
+        # Ugly patch for minus ambiguity (aka -5 or 4 - 5).
+        if followToken == '-':
+            self.minusAmbiguityFlag = True
         # In such a case we should simply push the argument.
         if (nextTokenType in {"integerConstant", "stringConstant"} or nextToken in {"true", "false", "null", "this"}):
             self.scopeType = "simpleTerminal"
@@ -490,9 +509,12 @@ class JackParser:
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
+
             # "weak condition, meant just to have a vague feeling"
+            # The basic identifier, stored in the symbolTable.
             elif (followToken in symbols1):
-                self.writingSimpleToken()
+                # retrive from table
+                self.compileSimpleVariable(nextToken)
 
             else:
                 #TODO: print ERROR here for non valid format.
@@ -506,21 +528,28 @@ class JackParser:
         #unaryOp case
         elif nextToken in { '-', '~'}:
             # Pushing the term and then activing the unary operand.
-            typeToken, opernad = self.popToken()
-            vmOp = opDic[opernad]
-            self.compileTerm()
-            self.writer.writeArithmetic(vmOp)
+            if not self.minusAmbiguityFlag: # patch for strange ambiguity.
+                typeToken, opernad = self.popToken()
+                vmOp = opDic[opernad]
+                self.compileTerm()
+                self.writer.writeArithmetic(vmOp)
         else:
+            # for all the other binary operands we shall return for a second round
             pass
-            #TODO: error we should have atleast one term.
-
+        
         nextTokenType , nextToken = self.rawTokens[0]
         if nextToken in opSet:
             # we push the next term and then call the binary operand on it.
             typeToken, binaryOp = self.popToken()
             self.compileTerm()
             vmOp = opDic[binaryOp]
-            if binaryOp in {'+', "&lt;", "&gt;", "&amp;", '|', '='}:
+            if binaryOp in {'+', '-', "&lt;", "&gt;", "&amp;", '|', '='}:
+                # we don'e write eq incase of a let function.
+                if binaryOp == '=' and self.letFlag:
+                    return
+                if binaryOp == '-':
+                    vmOp = "sub" # this is an override to the classic neg
+                    self.minusAmbiguityFlag = False
                 self.writer.writeArithmetic(vmOp)
             elif binaryOp in {'*', '/'}:
                 ARGS = 2
@@ -539,7 +568,7 @@ class JackParser:
             self.compileExpression()
             nextTokenType, nextToken = self.rawTokens[0]
             if nextToken == ",":
-                self.throwToken() # "getting to the next exp, removing the , "
+                self.throwToken() # "getting to the next exp, removing the comma"
         return num
     # Small function for initiating the project.
     def initProcess(self):
@@ -571,36 +600,3 @@ def parseOneFile(fileName):
     classRoot = clssNode()
     parser = JackParser(listOfTokens, writerObj, classRoot)
     parser.initProcess()
-
-
-    """
-    out of office, we only output to the vm now
-    # Writing into the output file with proper indentation the relevant terminal token.
-    def writeWithIndentation(self, type, token):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "<" + type + "> " + token + " <" + "/" + type + ">\n")
-    
-    # Opening clause for a non-terminal type.
-    def writeOpenClause(self, type):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "<" + type + ">" +'\n')
-
-    def writeClosingClause(self, type):
-        delim = self.delim
-        offset = self.indentaionMark * delim
-        self.outFile.write(offset + "</" + type + ">\n")
-    """
-    # Wrapping function for non-terminal type.
-    """
-    out of order, no xml output in thix ex
-    def wrappingNonTerminalFunc(self, nonTerminalName, internalFunc):
-        self.writeOpenClause(nonTerminalName)
-        self.indentaionMark += 1
-        tFunc = getattr(self, internalFunc)
-        tFunc()
-        self.indentaionMark -= 1
-        self.writeClosingClause(nonTerminalName)
-    """
-    
