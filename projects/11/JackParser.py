@@ -173,7 +173,7 @@ class JackParser:
             self.writer.writePush('argument', 0)
             self.writer.writePop('pointer', 0)
         if type == 'constructor':
-            globalVars = self.classScope.VarCount('field')
+            globalVars = self.classScope.getCurScope().VarCount('field')
             self.writer.writePush('constant', globalVars)
             self.writer.writeCall('Memory.alloc', 1)
             self.writer.writePop('pointer', 0)
@@ -500,17 +500,20 @@ class JackParser:
             "&lt;", "&gt;", "&amp;", "&quot"]
             if followToken == '[':
                 self.scopeType = "arrayProbing"
-                # "nameArr , '[' "
+                # "nameArr , '[' expression ']' "
                 type, nameArr = self.popToken()
                 # retrive memory location from symbolTable.
                 arrAtt = self.currentSubScope.getElementAttributes(nameArr) # [Type, Kind (segment), index]
                 debugMsg = "accessing array:" + nameArr
+
+                self.throwToken() # '['
+                self.compileExpression() # calculating the index (expression).
+                self.throwToken() # "]"
                 # set pointer 1, to the base address of the array from the scope symbol table.
                 self.writer.writePush(arrAtt[1], arrAtt[2], debugMsg) 
+                self.writer.writeArithmetic("add")
                 self.writer.writePop("pointer", 1)
-                self.throwToken() # '['
-                self.compileExpression() # calculating the index.
-                self.throwToken() # "]"
+                self.writer.writePush("that", 0)
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
