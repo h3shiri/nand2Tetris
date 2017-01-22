@@ -130,10 +130,9 @@ class JackParser:
     def compileClassVarDec(self):
         self.scopeType = "ClassVarDec"
         #writing the apprprpriate static/field string.
-        self.writingSimpleToken()
+        typeToken, actualType = self.popToken()
         # dealing with the variables list.
-        self.compileVariables()
-        # Closing tag, scope has been reduced back in compileVariables.
+        self.compileVariables(actualType)
 
     #compiles a method function or constructor        
     def compileSubRoutine(self):
@@ -189,7 +188,7 @@ class JackParser:
     def compileParametersList(self, type):
 
         if type == 'method':
-            self.classScope.getCurScope().AddLabel('argument', 'self', 'this')
+            self.classScope.getCurScope().addLabel('argument', 'self', 'this')
         self.scopeType = "parameterList"
         nextTokenType, nextToken = self.rawTokens[0]
 
@@ -203,19 +202,22 @@ class JackParser:
 
 
     # Compiling a sequence of variables including the ';'
-    def compileVariables(self):
+    def compileVariables(self, overrideType = None):
         self.scopeType = "variablesList"
         # begin by writing first mendatory first variable type and name.
         type, name = self.writingFewSimpleTokens(2)
-        self.classScope.getCurScope().addLabel('var', type[1], name[1])
+        actual_Kind = 'var' # default option inside a method
+        if overrideType != None:
+            actual_Kind = overrideType
+        self.classScope.getCurScope().addLabel(actual_Kind, type[1], name[1])
         #we are going to iterate until we reach a semicolon.
-        nextTokenType, nextToken = self.writingSimpleToken()
+        nextTokenType, nextToken = self.popToken()
         while (nextToken != ';'):
-            name = self.writingSimpleToken()
+            name = self.popToken()
             if(name[1] == ";"):
                 break
-            self.classScope.getCurScope().addLabel('var', type[1], name[1])
-            nextTokenType, nextToken = self.writingSimpleToken()
+            self.classScope.getCurScope().addLabel(actual_Kind, type[1], name[1])
+            nextTokenType, nextToken = self.popToken()
 
     #Compiles a var declaration
     def compileVarDec(self):
@@ -268,7 +270,7 @@ class JackParser:
             # case one subroutine name and calling expList.
             self.writer.writePush('pointer', 0)
             numLocals += 1
-            full =  self.classScope.getName() + left
+            full = self.classScope.getName() + left
             self.scopeType = "subroutineLocalMethodCall"
             self.writingFewSimpleTokens(2) # TODO: what are we throwing here ??
             # self.classScope.startSubroutine(missing name) , TODO: removing override.
@@ -302,8 +304,9 @@ class JackParser:
                 self.writer.writePush('argument', self.classScope.getCurScope().IndexOf(labelName))
         else:
             if self.classScope.getCurScope().KindOf(labelName) == 'static':
-                self.writer.writePush('static', self.classScope.getCurScope().IndexOf(labelName))
+                self.writer.writePush('static', self.classScope.classTableRoot.IndexOf(labelName))
             else:
+                # TODO: check this issue of producing 'this' None, into the vm file.
                 self.writer.writePush('this', self.classScope.getCurScope().IndexOf(labelName))
 
     def popHelper(self, name):
@@ -326,7 +329,7 @@ class JackParser:
     # compiles a let statement
     def compileLet(self):
         self.throwToken() # remove the let
-        self.letFlag = True # flag for indicating a defenition in place.
+        self.letFlag = True # flag for indicating a definition in place.
         self.scopeType = "letStatement"
         # unloading the varName
         tokenType, name = self.popToken()
@@ -338,6 +341,8 @@ class JackParser:
             self.compileExpression()
             self.writingSimpleToken()
 
+        # removing the equal '=' , exp
+        self.throwToken()
         # getting into the subsitution part
         self.compileExpression()
         self.throwToken() # "getting the semicolon"
@@ -428,13 +433,13 @@ class JackParser:
     TODO: pimp this function, properly.
     """
     def compileSimpleVariable(self, nextToken):
-        if self.currentSubScope != None:
-            if nextToken in self.currentSubScope.getLocalLabels():
+        if self.classScope.getCurScope() != None:
+            if nextToken in self.classScope.getCurScope().getLocalLabels():
                 self.pushHelper(nextToken)
-                self.throwToken() # the label ha been processed.
+                self.throwToken() # the label has been processed.
                 return # avoiding the chance of double poping.
 
-        if nextToken in self.classScope.getCurScope().getLocalLabels():
+        if nextToken in self.classScope.classTableRoot.getLocalLabels():
             self.pushHelper(nextToken)
             self.throwToken()
         else:
@@ -468,14 +473,15 @@ class JackParser:
             self.throwToken()
 
         elif nextToken == "this":
-        self.writer.writePush('pointer', 0)
-        self.popToken() # this
-        self.popToken() # ;
-        self.popToken() # }            #retrive from symbolTable should be at pointer 0. (effects methods and constructors)
+            self.writer.writePush('pointer', 0)
+            self.popToken() # this
+        
             pass
         else:
             print("non valid constant defenition error"+'\n')
             return
+
+
     #See supplied API for more details
     # differentiating between various scenarios (3) using a look ahead token.
     # We also compile additional terms and operands in between.
