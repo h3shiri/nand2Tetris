@@ -362,10 +362,14 @@ class JackParser:
         self.writingSimpleToken() # "closing '}' "
 
     # compiling a return statement
+    """
+    TODO: fix this function for the method/constructor options and test.
+    returning the relevnt this/object from symbolTable.
+    """
     def compileReturn(self):
         self.scopeType = "returnScope"
         # unloading the 'return' str
-        self.writingSimpleToken()
+        self.throwToken()
 
         # probing for an expression.
         nextTokenType, nextToken = self.rawTokens[0]
@@ -373,11 +377,12 @@ class JackParser:
         if nextToken == ";":
             retFlag = False
             self.writer.writePush('constant', 0)
-            self.writer.writeReturn() #TODO: CHECK THIS TOMORROW
-        #CONTINUE FORM HERE
+            self.writer.writeReturn()
+        
         if nextToken != ';':
             self.compileExpression()
-        self.writingSimpleToken() # "reaching for the semicolon"
+            self.writer.writeReturn()
+        self.throwToken() # "reaching for the semicolon"
 
     # compiling the if statement and including the possibility for else.
     def compileIf(self):
