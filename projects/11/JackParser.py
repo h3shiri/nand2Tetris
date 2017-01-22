@@ -468,8 +468,10 @@ class JackParser:
             self.throwToken()
 
         elif nextToken == "this":
-            #TODO: check whether to return the pointer 0, or other obj by the vm. (p.234)
-            #retrive from symbolTable should be at pointer 0. (effects methods and constructors)
+        self.writer.writePush('pointer', 0)
+        self.popToken() # this
+        self.popToken() # ;
+        self.popToken() # }            #retrive from symbolTable should be at pointer 0. (effects methods and constructors)
             pass
         else:
             print("non valid constant defenition error"+'\n')
