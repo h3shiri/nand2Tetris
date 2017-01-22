@@ -38,7 +38,7 @@ class Translator:
 	# writing an arithmetic command on the vm
 	def writeArithmetic(self, command, debug = None):
 		if command not in {"add", "sub", "and", "or", "neg", "not", "eq", "gt", "lt"}:
-			print("non supported arithmetic command")
+			print("non supported arithmetic command\n")
 			return
 		else:
 			string = command
