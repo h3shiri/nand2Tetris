@@ -46,7 +46,7 @@ class JackParser:
         self.classScope = classRoot
         self.className = ''
         # current function scope. TODO:manage this properly from one subroutine to another.
-        self.currentSubScope = None
+        self.currentSubScope = None # TODO: take out of service
         self.subRoutineCounter = 0
 
         # The relevant utility flags (p.243)
@@ -336,6 +336,7 @@ class JackParser:
             if self.classScope.getCurScope().getFather().KindOf(labelName) == 'static':
                 self.writer.writePush('static', self.classScope.classTableRoot.IndexOf(labelName))
             else:
+                print("not found in any scope\n")
                 self.writer.writePush('this', self.classScope.getCurScope().getFather().IndexOf(labelName))
 
     def popHelper(self, name):
@@ -366,13 +367,13 @@ class JackParser:
         nextTokenType, nextToken = self.rawTokens[0]
         if (nextToken == '['): # " '[' exp ']' "
             self.scopeType = "arrayInLetStatement"
-            self.writingSimpleToken()
+            self.throwToken()
             self.compileExpression()
-            self.writingSimpleToken()
+            self.throwToken()
 
         # removing the equal '=' , exp
         self.throwToken()
-        # getting into the subsitution part
+        # getting into the substitution part
         self.compileExpression()
         self.throwToken() # "getting the semicolon"
         self.popHelper(name)
@@ -483,8 +484,8 @@ class JackParser:
             self.writer.writeCall("String.new", 1)
             for x in range(length):
                 # pushing the argument for the String.appendChar(nextChar).
-                self.writer.writePush("constant", nextToken[x])
-                self.writer.writeCall("String.appendChar", 1)
+                self.writer.writePush("constant", ord(nextToken[x]))
+                self.writer.writeCall("String.appendChar", 2)
             self.throwToken()
         elif nextTokenType == "integerConstant":
             self.writer.writePush("constant", nextToken)
@@ -537,17 +538,18 @@ class JackParser:
                 # "nameArr , '[' expression ']' "
                 type, nameArr = self.popToken()
                 # retrive memory location from symbolTable.
-                arrAtt = self.currentSubScope.getElementAttributes(nameArr) # [Type, Kind (segment), index]
+                arrAtt = self.classScope.getCurScope().getElementAttributes(nameArr) # [Type, Kind (segment), index]
                 debugMsg = "accessing array:" + nameArr
 
                 self.throwToken() # '['
                 self.compileExpression() # calculating the index (expression).
                 self.throwToken() # "]"
                 # set pointer 1, to the base address of the array from the scope symbol table.
-                self.writer.writePush(arrAtt[1], arrAtt[2], debugMsg) 
+                self.popHelper(nameArr)
+
                 self.writer.writeArithmetic("add")
                 self.writer.writePop("pointer", 1)
-                self.writer.writePush("that", 0)
+                self.writer.writePop("that", 0)
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
