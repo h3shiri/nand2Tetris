@@ -54,7 +54,7 @@ class JackParser:
         # Ambiguity in case of terms for '-'
         self.minusAmbiguityFlag = False
         # flag for entering a definition of a method or a constructor.
-        self.MethodOrConstructorFlag = False
+        self.MethodFlag = False
 
         # all the actual tokens, stright from the tokenizer.
         self.rawTokens = listOfTokens
@@ -113,8 +113,8 @@ class JackParser:
                 
             # subroutines declarations.
             elif token in {"constructor", "function", "method"}:
-                if token in {"constructor", "method"}:
-                    self.MethodOrConstructorFlag = True
+                if token == "method":
+                    self.MethodFlag = True
                 self.scopeType = "subroutineDec"
                 self.compileSubRoutine()
                 
@@ -148,9 +148,9 @@ class JackParser:
         self.classScope.startSubroutine(self.name)
         self.classScope.setCurScope(self.name)
         # flag for entering a method/constructor and such pushing 'this' into the table
-        if self.MethodOrConstructorFlag:
+        if self.MethodFlag:
             self.classScope.getCurScope().addLabel("argument", self.className, "this")
-            self.MethodOrConstructorFlag = False
+            self.MethodFlag = False
         type = tokens[0][1] # type is function/method/constructor
         self.compileParametersList(type)
 
@@ -180,7 +180,7 @@ class JackParser:
             self.writer.writePush('argument', 0)
             self.writer.writePop('pointer', 0)
         if type == 'constructor':
-            globalVars = self.classScope.getCurScope().VarCount('field')
+            globalVars = self.classScope.getCurScope().getFather().VarCount('field')
             self.writer.writePush('constant', globalVars)
             self.writer.writeCall('Memory.alloc', 1)
             self.writer.writePop('pointer', 0)
@@ -194,10 +194,7 @@ class JackParser:
 
     #compiles a parameters list, not including the enclosing "()"
     def compileParametersList(self, type):
-        # TODO : check/remove this tiny if, it looks out of place, errors 1 - 'self', type == 'method' not possible.
-        # adding the this into the table happens with methodOrConstructorFlag earlier
-        # if type == 'method':
-        #     self.classScope.getCurScope().addLabel('argument', 'self', 'this')
+                
         self.scopeType = "parameterList"
         nextTokenType, nextToken = self.rawTokens[0]
 
@@ -268,13 +265,17 @@ class JackParser:
         self.writer.writePop('temp', 0)
         self.throwToken() # "catching the semicolon from the do statement"
         
-
+    # Compiling a subroutineCall for all its variety of cases.
     def compileSubroutineCall(self):
         numLocals = 0
         left = right = full = ''
         nextTokenType, nextToken = self.rawTokens[0]
         left = nextToken
         followerType, followerToken = self.rawTokens[1]
+        currentScope = self.classScope.getCurScope()
+        classScope = currentScope.getFather()
+        internalVariableFlag = False
+        classVariableFlag = False
         if followerToken == '(':
             # case one subroutine name and calling expList.
             self.writer.writePush('pointer', 0)
@@ -289,15 +290,35 @@ class JackParser:
             # calling foreign method aka nameV + '.' + nameM + '('
             tokens = self.writingFewSimpleTokens(4)
             right = tokens[2][1]
+
+            # in case obj is defined in current scope we would like the class name and pushing it as well.
+            if left in currentScope.getLocalLabels():
+                attr = currentScope.getElementAttributes(left)
+                className = attr[0]
+                index = attr[2]
+                left = className
+                internalVariableFlag = True
+                self.writer.writePush("local", index)
+            # in case we are refering to an object in the class scope
+            if classScope != None: 
+                if left in classScope.getLocalLabels():
+                    attr = classScope.getElementAttributes(left)
+                    className = attr[0]
+                    index = attr[2]
+                    left = className
+                    classVariableFlag = True
+                    self.writer.writePush("this", index)
             full = left + '.' + right
-            # self.classScope.startSubroutine(full) #WATCH: this causes an aweful override.
-            # table = self.classScope.getSubroutine(self.subRoutineCounter) #WATCH: non applied misplaced function.
             self.subRoutineCounter += 1
 
         else:
             print("non-valid function call - ERROR\n")
             return
         numLocals += self.compileExpressionList()
+        # patching for internal variables, which are used to call functions.
+        if internalVariableFlag or classVariableFlag:
+            numLocals += 1
+            internalVariableFlag = False
 
         self.writer.writeCall(full, numLocals)
         self.throwToken() # "closing bracket for the expL ')"
@@ -386,9 +407,7 @@ class JackParser:
 
         # probing for an expression.
         nextTokenType, nextToken = self.rawTokens[0]
-        retFlag = True
         if nextToken == ";":
-            retFlag = False
             self.writer.writePush('constant', 0)
             self.writer.writeReturn()
         
