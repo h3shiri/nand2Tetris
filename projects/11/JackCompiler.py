@@ -35,6 +35,7 @@ def main():
     if isDirectory():
         #directoryName = sysInput.split("/")[-2]
         filesToParse = listJackInDir()
+        filesToParse.sort()
         for file in filesToParse:
             if not sysInput.endswith("/"):
                 fileWithRelativePath = (sysInput + "/" + file)

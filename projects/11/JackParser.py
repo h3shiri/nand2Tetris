@@ -329,10 +329,10 @@ class JackParser:
             elif self.classScope.getCurScope().KindOf(name) == 'argument':
                 self.writer.writePop('argument', tempIndex)
         else:
-            if self.classScope.getCurScope().KindOf(name) == 'static':
+            if self.classScope.getCurScope().getFather().KindOf(name) == 'static':
                 self.writer.writePop('static', self.classScope.getCurScope().IndexOf(name))
             else:
-                self.writer.writePop('this', self.classScope.getCurScope().IndexOf(name))
+                self.writer.writePop('this', self.classScope.getCurScope().getFather().IndexOf(name))
 
     # compiles a let statement
     def compileLet(self):
