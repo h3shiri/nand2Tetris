@@ -53,6 +53,8 @@ class JackParser:
         self.letFlag = False
         # Ambiguity in case of terms for '-'
         self.minusAmbiguityFlag = False
+        # flag for entering a definition of a method or a constructor.
+        self.MethodOrConstructorFlag = False
 
         # all the actual tokens, stright from the tokenizer.
         self.rawTokens = listOfTokens
@@ -111,6 +113,8 @@ class JackParser:
                 
             # subroutines declarations.
             elif token in {"constructor", "function", "method"}:
+                if token in {"constructor", "method"}:
+                    self.MethodOrConstructorFlag = True
                 self.scopeType = "subroutineDec"
                 self.compileSubRoutine()
                 
@@ -143,7 +147,11 @@ class JackParser:
         self.name = self.className + "." + tokens[2][1]
         self.classScope.startSubroutine(self.name)
         self.classScope.setCurScope(self.name)
-        type = tokens[0][1] #type is function/method/constructor
+        # flag for entering a method/constructor and such pushing 'this' into the table
+        if self.MethodOrConstructorFlag:
+            self.classScope.getCurScope().addLabel("argument", self.className, "this")
+            self.MethodOrConstructorFlag = False
+        type = tokens[0][1] # type is function/method/constructor
         self.compileParametersList(type)
 
         #the closing brackets ')'
@@ -186,9 +194,10 @@ class JackParser:
 
     #compiles a parameters list, not including the enclosing "()"
     def compileParametersList(self, type):
-
-        if type == 'method':
-            self.classScope.getCurScope().addLabel('argument', 'self', 'this')
+        # TODO : check/remove this tiny if, it looks out of place, errors 1 - 'self', type == 'method' not possible.
+        # adding the this into the table happens with methodOrConstructorFlag earlier
+        # if type == 'method':
+        #     self.classScope.getCurScope().addLabel('argument', 'self', 'this')
         self.scopeType = "parameterList"
         nextTokenType, nextToken = self.rawTokens[0]
 
@@ -270,10 +279,9 @@ class JackParser:
             # case one subroutine name and calling expList.
             self.writer.writePush('pointer', 0)
             numLocals += 1
-            full = self.classScope.getName() + left
+            full = self.classScope.getName() + '.' + left
             self.scopeType = "subroutineLocalMethodCall"
-            self.writingFewSimpleTokens(2) # TODO: what are we throwing here ??
-            # self.classScope.startSubroutine(missing name) , TODO: removing override.
+            self.writingFewSimpleTokens(2) # throwing name and '('
             self.subRoutineCounter += 1
 
         elif followerToken == '.':
@@ -303,11 +311,11 @@ class JackParser:
             elif self.classScope.getCurScope().KindOf(labelName) == 'argument':
                 self.writer.writePush('argument', self.classScope.getCurScope().IndexOf(labelName))
         else:
-            if self.classScope.getCurScope().KindOf(labelName) == 'static':
+            # note reference to father scope.
+            if self.classScope.getCurScope().getFather().KindOf(labelName) == 'static':
                 self.writer.writePush('static', self.classScope.classTableRoot.IndexOf(labelName))
             else:
-                # TODO: check this issue of producing 'this' None, into the vm file.
-                self.writer.writePush('this', self.classScope.getCurScope().IndexOf(labelName))
+                self.writer.writePush('this', self.classScope.getCurScope().getFather().IndexOf(labelName))
 
     def popHelper(self, name):
         #TODO: remove redundant prints
@@ -475,8 +483,7 @@ class JackParser:
         elif nextToken == "this":
             self.writer.writePush('pointer', 0)
             self.popToken() # this
-        
-            pass
+
         else:
             print("non valid constant defenition error"+'\n')
             return
