@@ -39,7 +39,9 @@ class JackTokenizer:
 
     def __init__(self, infile):
         #Opens the file and gets ready to tokenize
+        self.original = ""
         self.file = open(infile)
+        self.strings = []
         self.token = ""
         self.p1_comments = re.compile(r"^\s*\/?\*")
         self.tokens = self.parseFile()
@@ -47,7 +49,6 @@ class JackTokenizer:
         self.identifiers = []
         self.isFirstQuot = False
         self.isSecondQuot = False
-
     def removeCommentsFromLine(self, line):
         if line[0] == "/":
             return None
@@ -77,8 +78,13 @@ class JackTokenizer:
     def fixString(self, toFix):
         global symbols
         stripped = toFix.strip()
+
         symbol = stripped[-1:]
         if (symbol.isalpha() or symbol.isdigit()):
+            if stripped in self.strings:
+                return stripped
+            elif (stripped + " ") in self.strings:
+                return stripped + " "
             return stripped
         stripped = stripped[:-2]
         stripped +=symbol + " "
@@ -89,15 +95,20 @@ class JackTokenizer:
         fixedTokens = []
         quotOpen = False
         stringWithSpaces = ""
+        start = 0
+        end = 0
         for token in tokens:
-            if token == '"':
+            if token == '"' or token == '”':
                 if quotOpen == False:
+                    startForString = start
                     quotOpen = True
                     continue
             if quotOpen == True:
-                if token == '"':
+                if token == '"' or token == '”':
                     quotOpen = False
+
                     fixedTokens.append(self.fixString(stringWithSpaces))
+                    self.strings.append(self.fixString(stringWithSpaces))
                     stringWithSpaces = ""
                     continue
                 stringWithSpaces += " " + token
@@ -111,6 +122,20 @@ class JackTokenizer:
             else:
                 fixedTokens.append(token)
         return fixedTokens
+    def findStrings(self, line):
+        open = False
+        curString = ""
+        for char in line:
+            if char ==  '"' or char == '”':
+                if open == False:
+                    open = True
+                    continue
+                elif open == True:
+                    self.strings.append(curString)
+                    open = False
+            elif open == True:
+                curString += char
+
 
     def parseFile(self):
         #This parses the file and returns array of tokens
@@ -118,6 +143,8 @@ class JackTokenizer:
         tokens = []
         for line in self.file.readlines():
             cleanLine = self.removeCommentsFromLine2(line)
+            if cleanLine != None:
+                self.findStrings(cleanLine)
             if cleanLine != None:
                 cleanLines.append(cleanLine)
         for cleanLine in cleanLines:
@@ -138,6 +165,8 @@ class JackTokenizer:
 
     def getTypeOfToken(self):
         global keywords, symbols
+        if self.token in self.strings:
+            return "stringConstant"
         if (self.isFirstQuot == True and self.isSecondQuot == False):
             self.isSecondQuot = True
             return "stringConstant"
@@ -213,4 +242,4 @@ def main():
         writeToXML(xml, type, token)
     xml.write("</tokens>")
 
-# main()
+#main()
