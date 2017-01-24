@@ -363,20 +363,39 @@ class JackParser:
         self.scopeType = "letStatement"
         # unloading the varName
         tokenType, name = self.popToken()
-
+        ArrayInLetFlag = False
         nextTokenType, nextToken = self.rawTokens[0]
         if (nextToken == '['): # " '[' exp ']' "
             self.scopeType = "arrayInLetStatement"
             self.throwToken()
             self.compileExpression()
             self.throwToken()
-
+            # accessing the array address
+            self.pushHelper(name)
+            self.writer.writeArithmetic("add")
+            ArrayInLetFlag = True
         # removing the equal '=' , exp
         self.throwToken()
         # getting into the substitution part
         self.compileExpression()
+        # extra work in case of an array previous access.
+        """
+        Handling the array sequence on the stack.
+        pop temp 0
+        pop pointer 1
+        push temp 0
+        pop that 0
+        """
+        if ArrayInLetFlag:
+            self.writer.writePop("temp", 0)
+            self.writer.writePop("pointer", 1)
+            self.writer.writePush("temp", 0)
+            self.writer.writePop("that", 0)
+            ArrayInLetFlag = False
+
+        else:
+            self.popHelper(name)
         self.throwToken() # "getting the semicolon"
-        self.popHelper(name)
         self.letFlag = False # turning of the flag
 
     # compiling the while condition
@@ -545,11 +564,11 @@ class JackParser:
                 self.compileExpression() # calculating the index (expression).
                 self.throwToken() # "]"
                 # set pointer 1, to the base address of the array from the scope symbol table.
-                self.popHelper(nameArr)
+                self.pushHelper(nameArr)
 
                 self.writer.writeArithmetic("add")
                 self.writer.writePop("pointer", 1)
-                self.writer.writePop("that", 0)
+                self.writer.writePush("that", 0)
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
