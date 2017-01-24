@@ -53,6 +53,8 @@ class JackParser:
         self.letFlag = False
         # Ambiguity in case of terms for '-'
         self.minusAmbiguityFlag = False
+        # indicating the minus isn't firstly declared.
+        self.minusAmbiguityFlag2 = False
         # flag for entering a definition of a method or a constructor.
         self.MethodFlag = False
 
@@ -324,8 +326,7 @@ class JackParser:
         self.throwToken() # "closing bracket for the expL ')"
     
     def pushHelper(self, labelName):
-        #TODO: remove redundant prints
-        print(self.classScope.getCurScope().scopeName)
+        # print(self.classScope.getCurScope().scopeName)
         if labelName in self.classScope.getCurScope().getLocalLabels():
             if self.classScope.getCurScope().KindOf(labelName) == 'var':
                 self.writer.writePush('local', self.classScope.getCurScope().IndexOf(labelName))
@@ -336,12 +337,11 @@ class JackParser:
             if self.classScope.getCurScope().getFather().KindOf(labelName) == 'static':
                 self.writer.writePush('static', self.classScope.classTableRoot.IndexOf(labelName))
             else:
-                print("not found in any scope\n")
+                # print("not found in any scope\n") WATCH
                 self.writer.writePush('this', self.classScope.getCurScope().getFather().IndexOf(labelName))
 
     def popHelper(self, name):
-        #TODO: remove redundant prints
-        print(self.classScope.getCurScope().scopeName)
+        # print(self.classScope.getCurScope().scopeName)
 
         if name in self.classScope.getCurScope().getLocalLabels():
             tempKind = self.classScope.getCurScope().KindOf(name)
@@ -352,7 +352,7 @@ class JackParser:
                 self.writer.writePop('argument', tempIndex)
         else:
             if self.classScope.getCurScope().getFather().KindOf(name) == 'static':
-                self.writer.writePop('static', self.classScope.getCurScope().IndexOf(name))
+                self.writer.writePop('static', self.classScope.getCurScope().getFather().IndexOf(name))
             else:
                 self.writer.writePop('this', self.classScope.getCurScope().getFather().IndexOf(name))
 
@@ -561,6 +561,8 @@ class JackParser:
                 debugMsg = "accessing array:" + nameArr
 
                 self.throwToken() # '['
+                self.minusAmbiguityFlag2 = False
+                self.minusAmbiguityFlag = False
                 self.compileExpression() # calculating the index (expression).
                 self.throwToken() # "]"
                 # set pointer 1, to the base address of the array from the scope symbol table.
@@ -569,6 +571,9 @@ class JackParser:
                 self.writer.writeArithmetic("add")
                 self.writer.writePop("pointer", 1)
                 self.writer.writePush("that", 0)
+                tokentype, token = self.rawTokens[0]
+                if token == '-':
+                    self.minusAmbiguityFlag2 = True
             elif (followToken in {'(', '.'}): # "dot leads to object calling a function as well"
                 self.scopeType = "callToFunctionFromTerm"
                 self.compileSubroutineCall()
@@ -586,12 +591,18 @@ class JackParser:
         # Another expression inside
         elif nextToken == '(':
             self.throwToken() # "moving the openner '(' "
+            self.minusAmbiguityFlag2 = False
+            self.minusAmbiguityFlag = False
             self.compileExpression()
             self.throwToken() # "closing the exp with ')' "
+            tokentype, token = self.rawTokens[0]
+            if token == '-':
+                self.minusAmbiguityFlag2 = True
+        
         #unaryOp case
         elif nextToken in { '-', '~'}:
             # Pushing the term and then activing the unary operand.
-            if not self.minusAmbiguityFlag: # patch for strange ambiguity.
+            if not (self.minusAmbiguityFlag or self.minusAmbiguityFlag2): # patch for strange ambiguity.
                 typeToken, opernad = self.popToken()
                 vmOp = opDic[opernad]
                 self.compileTerm()
@@ -613,11 +624,13 @@ class JackParser:
                 if binaryOp == '-':
                     vmOp = "sub" # this is an override to the classic neg
                     self.minusAmbiguityFlag = False
+                    self.minusAmbiguityFlag2 = False
                 self.writer.writeArithmetic(vmOp)
             elif binaryOp in {'*', '/'}:
                 ARGS = 2
                 self.writer.writeCall(vmOp, ARGS)
 
+        self.minusAmbiguityFlag2 = False # WATCH
         # self reference should be indurable here due to stack poping, checking for op.
                
 

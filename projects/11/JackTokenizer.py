@@ -83,9 +83,13 @@ class JackTokenizer:
         if (symbol.isalpha() or symbol.isdigit()):
             if stripped in self.strings:
                 return stripped
+            # WATCH: this issues especially in case of multiple spaces.
+            elif stripped[:-1] in self.strings:
+                return stripped
             elif (stripped + " ") in self.strings:
                 return stripped + " "
-            return stripped
+            else:
+                return stripped
         stripped = stripped[:-2]
         stripped +=symbol + " "
         return stripped
@@ -242,4 +246,4 @@ def main():
         writeToXML(xml, type, token)
     xml.write("</tokens>")
 
-#main()
+# main()
