@@ -81,15 +81,18 @@ class JackTokenizer:
 
         symbol = stripped[-1:]
         if (symbol.isalpha() or symbol.isdigit()):
-            if stripped in self.strings:
+            print("|" + stripped + "|")
+            print("|" + toFix + "|")
+            print(self.strings)
+            if toFix.strip() in self.strings:
+                return toFix.strip()
+            if stripped[:-1] in self.strings:
                 return stripped
-            # WATCH: this issues especially in case of multiple spaces.
-            elif stripped[:-1] in self.strings:
+            elif stripped in self.strings:
                 return stripped
             elif (stripped + " ") in self.strings:
                 return stripped + " "
-            else:
-                return stripped
+            return stripped
         stripped = stripped[:-2]
         stripped +=symbol + " "
         return stripped
@@ -102,21 +105,6 @@ class JackTokenizer:
         start = 0
         end = 0
         for token in tokens:
-            if token == '"' or token == '”':
-                if quotOpen == False:
-                    startForString = start
-                    quotOpen = True
-                    continue
-            if quotOpen == True:
-                if token == '"' or token == '”':
-                    quotOpen = False
-
-                    fixedTokens.append(self.fixString(stringWithSpaces))
-                    self.strings.append(self.fixString(stringWithSpaces))
-                    stringWithSpaces = ""
-                    continue
-                stringWithSpaces += " " + token
-                continue
             if token == "<":
                 fixedTokens.append("&lt;")
             elif token == ">":
@@ -126,11 +114,12 @@ class JackTokenizer:
             else:
                 fixedTokens.append(token)
         return fixedTokens
+
     def findStrings(self, line):
         open = False
         curString = ""
         for char in line:
-            if char ==  '"' or char == '”':
+            if char ==  '"':
                 if open == False:
                     open = True
                     continue
@@ -151,13 +140,50 @@ class JackTokenizer:
                 self.findStrings(cleanLine)
             if cleanLine != None:
                 cleanLines.append(cleanLine)
+
+        curToken = ""
         for cleanLine in cleanLines:
             #tokens += re.split(r"(\W+)", cleanLine)
-            tokens += [token for token in re.split(r"(\W)", cleanLine) if token.strip()]
+            openString = False
+            curString = ""
+            if curToken != "" and curToken != " ":
+                tokens.append(curToken)
+            curToken = ""
+            i = 0
+            for char in cleanLine:
 
-        tokens = [x.strip(' ') for x in tokens]
+                if char == '"':
+                    if openString:
+                        tokens.append(curString)
+                        openString = False
+                    else:
+                        openString = True
+                else:
+
+                    if openString:
+                        curString += char
+                    elif char in symbols:
+                        if curToken != "" and curToken!= " ":
+                            tokens.append(curToken)
+                            curToken = ""
+                            tokens.append(char)
+                        else:
+                            if char != " ":
+                                tokens.append((char))
+                    elif char == " ":
+                        if curToken != " ":
+                            tokens.append(curToken)
+                        curToken = ""
+                    else:
+                        curToken += char
+
 
         return self.fixTokens(list(filter(bool, tokens)))
+            #tokens += [token for token in re.split(r"(\W)", cleanLine) if token.strip()]
+
+        #tokens = [x.strip(' ') for x in tokens]
+
+        #return self.fixTokens(list(filter(bool, tokens)))
 
     def hasMoreTokens(self):
         #Do we have more tokens?
@@ -246,4 +272,4 @@ def main():
         writeToXML(xml, type, token)
     xml.write("</tokens>")
 
-# main()
+#main()

@@ -1,0 +1,22 @@
+h3shiri, eyzuky
+===============================================================================
+Eyal Silberman, ID 30309734, eyal.silberman@mail.huji.ac.il
+Shiri Heffetz, ID 206098311, shiri.heffetz@mail.huji.ac.il
+===============================================================================
+
+                           Project 11 - Building the compiler, compiling the tokens.
+                           ----------------------- 
+
+Submitted Files
+---------------
+README - this file.
+JackCompiler - driver to our compiler for jack, according to appropriate jack files.
+JackParser.py - assembling all the rokens according to the CFG of Jack and actually compiling the tokens
+VMWriter.py - A writing module to the vm syntax.
+SymbolTable.py - An abstraction of a table holding all the relevant variables for each scope. 
+JackTokenizer.py - Breaking down file input into the relevant tokens.
+Makefile - making our script executable.
+
+Remarks
+-------
+This is wicked, watch out not to burn your eyes.
